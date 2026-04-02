@@ -1,0 +1,133 @@
+design:
+  name: spdt_switch
+  variant: initial_placeplan
+  source_file: input/spdt_switch_ads_import.net
+  supporting_files:
+    - input/spdt_switch.net
+    - input/spdt_switch_prep.net
+
+placement_objective:
+  summary: >
+    Generate a readable and safe ADS schematic placement plan for the SPDT switch
+    example. Preserve logical connectivity while improving functional separation,
+    spacing, and connection safety.
+  priorities:
+    - clear_main_rf_path
+    - separate_control_and_bias_from_rf
+    - reduce_ambiguous_symbol_proximity
+    - support_deterministic_ads_build
+    - preserve_logical_meaning
+
+functional_groups:
+  - name: rf_input_group
+    role: input_port
+    members: []
+    lane: rf_main
+    anchor_priority: 1
+
+  - name: switch_core_group
+    role: main_switch_core
+    members: []
+    lane: rf_main
+    anchor_priority: 2
+
+  - name: upper_branch_group
+    role: rf_branch
+    members: []
+    lane: rf_main
+    anchor_priority: 3
+
+  - name: lower_branch_group
+    role: rf_branch
+    members: []
+    lane: rf_main
+    anchor_priority: 4
+
+  - name: gate_bias_upper_group
+    role: control_bias
+    members: []
+    lane: control_bias
+    anchor_priority: 6
+
+  - name: gate_bias_lower_group
+    role: control_bias
+    members: []
+    lane: control_bias
+    anchor_priority: 7
+
+  - name: shunt_return_group
+    role: shunt_ground_support
+    members: []
+    lane: shunt_ground
+    anchor_priority: 5
+
+  - name: simulation_group
+    role: simulation_control
+    members: []
+    lane: simulation
+    anchor_priority: 8
+
+lanes:
+  - name: rf_main
+    purpose: Main RF signal path lane
+    relative_position: center
+
+  - name: control_bias
+    purpose: Control and gate bias lane
+    relative_position: top
+
+  - name: shunt_ground
+    purpose: Shunt and ground-support lane
+    relative_position: bottom
+
+  - name: simulation
+    purpose: Simulation and measurement lane
+    relative_position: side
+
+ordering_constraints:
+  - type: left_to_right_rf_flow
+    description: RF input should appear left of switch core and branch outputs to the right
+
+  - type: switch_core_central
+    description: Switch core should be central relative to input and outputs
+
+  - type: branch_visual_separation
+    description: Upper and lower branches should be visually distinct
+
+spacing_guidance:
+  unrelated_group_spacing:
+    level: large
+  branch_point_clearance:
+    level: large
+  control_to_rf_lane_spacing:
+    level: large
+  unconnected_pin_clearance:
+    level: extra_large
+
+routing_guidance:
+  main_rf_route:
+    style: mostly_horizontal
+  control_route:
+    style: separate_lane_with_vertical_drops
+  shunt_return_route:
+    style: vertical_returns_to_lower_lane
+
+anchor_elements:
+  - rf_input_group
+  - switch_core_group
+  - upper_branch_group
+  - lower_branch_group
+  - simulation_group
+
+validation_expectations:
+  - main_rf_path_is_visually_clear
+  - branch_structure_is_recognizable
+  - control_and_bias_are_separated_from_rf
+  - unrelated_components_are_not_crowded
+  - placement_plan_preserves_logical_connectivity
+
+review_notes:
+  status: starter_template
+  intended_use: >
+    The sub-agent should fill group members and refine placement guidance based on
+    the actual contents of spdt_switch_ads_import.net.
