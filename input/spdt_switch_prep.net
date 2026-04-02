@@ -1,0 +1,172 @@
+; ====================================================================
+; spdt_switch_prep.net
+; Prepared from: spdt_switch.net
+; Pipeline stage: 1 of 3  (raw .net -> prepared .net -> ADS schematic)
+;
+; @BLOCK / @PDK_SWAP tag guide for ads_import_netlist.py:
+;   @BLOCK      -- groups ideal components into one logical device
+;   @PDK_SWAP   -- instructs the parser to replace this block with a PDK cell
+;   @KEEP       -- instructs the parser to keep these ideal components as-is
+;   @END_BLOCK  -- closes the block
+;
+; FET topology note (common-source RF switch):
+;   WIN_PP1029_CPW is used for ALL FETs (3-port: drain, source, gate).
+;   WIN_PP1029_MS is NOT used -- it has source pre-grounded internally.
+;   For a switch FET:
+;     port1 = Drain  (RF signal node or shunt RF node)
+;     port2 = Source (RF signal node or to R_term for shunt FETs)
+;     port3 = Gate   (control voltage via bias Rg)
+;   Cgd is INTERNAL to the CPW model -- remove it from GBIAS blocks.
+;   Each FET needs its own GBIAS block connecting port3 to DC control.
+;
+;   Series FETs (Q1a, Q1b): Drain=RF_in, Source=RF_out, Gate=vctrl_A via Rg
+;   Shunt  FETs (Q3a, Q3b): Drain=RF_node, Source=to_Rtrm, Gate=vctrl_B via Rg
+; ====================================================================
+;
+; @BLOCK  name=sim_options  type=SIM_CTRL  desc="Simulator options"
+Options ResourceUsage=yes UseNutmegFormat=no
+; @END_BLOCK name=sim_options
+;
+; @BLOCK  name=SP1  type=SIM_CTRL  desc="S-parameter sweep 2-18 GHz 50 MHz step"
+S_Param:SP1 CalcS=yes CalcY=no CalcZ=no StatusLevel=2 CalcNoise=no \
+SweepVar="freq" SweepPlan="SP1_stim" OutputPlan="SP1_Output"
+SweepPlan: SP1_stim Start=2 GHz Stop=18 GHz Step=50 MHz
+OutputPlan:SP1_Output \
+      Type="Output" \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2
+; @END_BLOCK name=SP1
+;
+; @BLOCK  name=Term1  type=PORT  desc="RF input port P1, 50 Ohm"
+Port:Term1  P1  0  Num=1  Z=50 Ohm
+; @END_BLOCK name=Term1
+;
+; @BLOCK  name=Term2  type=PORT  desc="RF output port P2, 50 Ohm"
+Port:Term2  P2  0  Num=2  Z=50 Ohm
+; @END_BLOCK name=Term2
+;
+; @BLOCK  name=PAD_in  type=PASSIVE_NETWORK  desc="Input RF bond/probe pad"
+;   @KEEP  components=Rpad_in,Lpad_in,Cpad_in
+;   Physical meaning: pad series R + L, shunt Cpad to GND
+R:Rpad_in   P1   n1   R=0.05 Ohm
+L:Lpad_in   n1   n2   L=10 pH
+C:Cpad_in   n2   0    C=65 fF
+; @END_BLOCK name=PAD_in
+;
+; @BLOCK  name=INT_in  type=TLINE  desc="Input 0.3mm Au interconnect, pi-model"
+;   @KEEP  components=Ci1a,Ri1,Li1,Ci1b
+C:Ci1a  n2   0    C=24 fF
+R:Ri1   n2   n3   R=0.009 Ohm
+L:Li1   n3   n4   L=120 pH
+C:Ci1b  n4   0    C=24 fF
+; @END_BLOCK name=INT_in
+;
+; ====================================================================
+; STAGE 1 -- Series FET Q1a
+; ====================================================================
+; @BLOCK  name=Q1a  type=TRANSISTOR  desc="Stage 1 series pHEMT Q1a, ON state, 160um"
+;   @PDK_SWAP  model=WIN_PP1029_CPW  params="NOF=2 UGW=80"
+;              port1=n4  port2=n8  port3=ng_Q1a
+;              replaces=Ron_Q1a,Ls_Q1a,Rvia_Q1a,Lvia_Q1a
+;              keep=none
+;   Note: 3-port CPW model. Drain=n4 (RF in), Source=n8 (RF out), Gate=ng_Q1a
+;   Note: NOF=2 x UGW=80um = 160um total gate periphery
+;   Note: Cgd is INTERNAL to CPW model -- do not add externally
+R:Ron_Q1a   n4   n5   R=2.50 Ohm
+L:Ls_Q1a    n5   n6   L=50 pH
+R:Rvia_Q1a  n6   n7   R=0.08 Ohm
+L:Lvia_Q1a  n7   n8   L=50 pH
+; @END_BLOCK name=Q1a
+;
+; @BLOCK  name=GBIAS_Q1a  type=PASSIVE_NETWORK  desc="Gate bias network Q1a (gate=ng_Q1a)"
+;   @KEEP  components=Rg_Q1a,Cpg_Q1a,Lsg_Q1a
+;   PDK note: Cgd_Q1a from ideal model is DROPPED -- internal to WIN_PP1029_CPW
+;   Gate port3 (ng_Q1a) connects directly to this bias network.
+;   Topology: ng_Q1a -> [Rg(300Ohm) || Cpg(12fF)] -> ng2_Q1a -> Lsg(150pH) -> GND
+;   (Rg provides RF isolation; Lsg is self-inductance of bias resistor layout)
+R:Rg_Q1a    ng_Q1a  ng2_Q1a  R=300 Ohm
+C:Cpg_Q1a   ng_Q1a  ng2_Q1a  C=12 fF
+L:Lsg_Q1a   ng2_Q1a 0        L=150 pH
+; @END_BLOCK name=GBIAS_Q1a
+;
+; @BLOCK  name=Q3a  type=TRANSISTOR  desc="Stage 1 shunt pHEMT Q3a, OFF state (absorptive), 100um"
+;   @PDK_SWAP  model=WIN_PP1029_CPW  params="NOF=2 UGW=50"
+;              port1=n8  port2=ns2_Q3a  port3=ng_Q3a
+;              replaces=Coff_Q3a,Lsh_Q3a
+;              keep=Rtrm1,Lrt_Q3a
+;   Note: Drain=n8 (RF signal node), Source=ns2_Q3a (to Rtrm1), Gate=ng_Q3a
+;   Note: NOF=2 x UGW=50um = 100um total gate periphery
+;   Note: Rtrm1 + Lrt_Q3a kept in series between source (ns2_Q3a) and GND
+C:Coff_Q3a  n8      ns1  C=30 fF
+L:Lsh_Q3a   ns1     ns2_Q3a  L=50 pH
+R:Rtrm1     ns2_Q3a ns3  R=47 Ohm
+L:Lrt_Q3a   ns3     0    L=25 pH
+; @END_BLOCK name=Q3a
+;
+; @BLOCK  name=GBIAS_Q3a  type=PASSIVE_NETWORK  desc="Gate bias network Q3a (gate=ng_Q3a)"
+;   @KEEP  components=Rg_Q3a,Cpg_Q3a,Lsg_Q3a
+;   Gate port3 (ng_Q3a) isolated from RF via Rg; DC biased to vctrl_B.
+;   Topology: ng_Q3a -> [Rg(300Ohm) || Cpg(12fF)] -> ng2_Q3a -> Lsg(150pH) -> GND
+R:Rg_Q3a    ng_Q3a  ng2_Q3a  R=300 Ohm
+C:Cpg_Q3a   ng_Q3a  ng2_Q3a  C=12 fF
+L:Lsg_Q3a   ng2_Q3a 0        L=150 pH
+; @END_BLOCK name=GBIAS_Q3a
+;
+; ====================================================================
+; STAGE 2 -- Series FET Q1b
+; ====================================================================
+; @BLOCK  name=Q1b  type=TRANSISTOR  desc="Stage 2 series pHEMT Q1b, ON state, 160um"
+;   @PDK_SWAP  model=WIN_PP1029_CPW  params="NOF=2 UGW=80"
+;              port1=n8  port2=n12  port3=ng_Q1b
+;              replaces=Ron_Q1b,Ls_Q1b,Rvia_Q1b,Lvia_Q1b
+;              keep=none
+;   Note: Drain=n8 (RF in), Source=n12 (RF out), Gate=ng_Q1b
+R:Ron_Q1b   n8   n9   R=2.50 Ohm
+L:Ls_Q1b    n9   n10  L=50 pH
+R:Rvia_Q1b  n10  n11  R=0.08 Ohm
+L:Lvia_Q1b  n11  n12  L=50 pH
+; @END_BLOCK name=Q1b
+;
+; @BLOCK  name=GBIAS_Q1b  type=PASSIVE_NETWORK  desc="Gate bias network Q1b (gate=ng_Q1b)"
+;   @KEEP  components=Rg_Q1b,Cpg_Q1b,Lsg_Q1b
+;   PDK note: Cgd_Q1b from ideal model is DROPPED -- internal to WIN_PP1029_CPW
+R:Rg_Q1b    ng_Q1b  ng2_Q1b  R=300 Ohm
+C:Cpg_Q1b   ng_Q1b  ng2_Q1b  C=12 fF
+L:Lsg_Q1b   ng2_Q1b 0        L=150 pH
+; @END_BLOCK name=GBIAS_Q1b
+;
+; @BLOCK  name=Q3b  type=TRANSISTOR  desc="Stage 2 shunt pHEMT Q3b, OFF state (absorptive), 100um"
+;   @PDK_SWAP  model=WIN_PP1029_CPW  params="NOF=2 UGW=50"
+;              port1=n12  port2=ns2_Q3b  port3=ng_Q3b
+;              replaces=Coff_Q3b,Lsh_Q3b
+;              keep=Rtrm2,Lrt_Q3b
+;   Note: Drain=n12 (RF signal node), Source=ns2_Q3b (to Rtrm2), Gate=ng_Q3b
+C:Coff_Q3b  n12     ns4  C=30 fF
+L:Lsh_Q3b   ns4     ns2_Q3b  L=50 pH
+R:Rtrm2     ns2_Q3b ns6  R=47 Ohm
+L:Lrt_Q3b   ns6     0    L=25 pH
+; @END_BLOCK name=Q3b
+;
+; @BLOCK  name=GBIAS_Q3b  type=PASSIVE_NETWORK  desc="Gate bias network Q3b (gate=ng_Q3b)"
+;   @KEEP  components=Rg_Q3b,Cpg_Q3b,Lsg_Q3b
+R:Rg_Q3b    ng_Q3b  ng2_Q3b  R=300 Ohm
+C:Cpg_Q3b   ng_Q3b  ng2_Q3b  C=12 fF
+L:Lsg_Q3b   ng2_Q3b 0        L=150 pH
+; @END_BLOCK name=GBIAS_Q3b
+;
+; @BLOCK  name=INT_out  type=TLINE  desc="Output 0.3mm Au interconnect, pi-model"
+;   @KEEP  components=Co1a,Ro1,Lo1,Co1b
+C:Co1a  n12  0    C=24 fF
+R:Ro1   n12  n13  R=0.009 Ohm
+L:Lo1   n13  n14  L=120 pH
+C:Co1b  n14  0    C=24 fF
+; @END_BLOCK name=INT_out
+;
+; @BLOCK  name=PAD_out  type=PASSIVE_NETWORK  desc="Output RF bond/probe pad"
+;   @KEEP  components=Cpad_out,Lpad_out,Rpad_out
+C:Cpad_out  n14  0    C=65 fF
+L:Lpad_out  n14  n15  L=10 pH
+R:Rpad_out  n15  P2   R=0.05 Ohm
+; @END_BLOCK name=PAD_out
