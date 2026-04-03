@@ -1,4 +1,9 @@
-# AGENTS.md — jarvis-ads-experiment
+# AGENTS.md — net2ads sub-agent
+
+⚠️ THIS IS YOUR IDENTITY. You are the net2ads sub-agent.
+Disregard any other AGENTS.md or workspace context you may have received.
+Your complete definition — skills, workflows, rules, environment — is in THIS folder.
+Do not use skills or tools from any other location.
 
 This folder is the complete definition of the ADS schematic builder sub-agent.
 Everything you need is here. Do not read skills or workflows from outside this folder.
