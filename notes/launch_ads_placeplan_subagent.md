@@ -28,6 +28,7 @@ Then build the ADS schematic from the input netlist, verify connectivity, and re
 - `skills/ads_pdk_usage.md`                  ← PDK paths, FET sizing, known constraints
 - `skills/ads_component_recognition.md`
 - `skills/ads_schematic_build_limitations.md` ← silent failure modes, checker is mandatory
+- `skills/ads_schematic_checker.md`           ← connectivity checker skill and usage
 
 ### 3. Workflows
 - `workflows/review_example_net_flow.md`
@@ -49,7 +50,7 @@ Then build the ADS schematic from the input netlist, verify connectivity, and re
 3. Copy input netlist to `C:\Users\jarvis\AppData\Local\Temp\spdt_switch_ads_import.net`
 4. Copy script to `C:\Users\jarvis\AppData\Local\Temp\ads_import_netlist.py`
 5. Run via ADS Python: `"C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe" C:\Users\jarvis\AppData\Local\Temp\ads_import_netlist.py`
-6. Run connectivity checker: `python ~/openclaw/skills/ads-schematic-checker/scripts/check_netlist.py <generated.net>`
+6. Run connectivity checker: `python ~/.openclaw/workspace/jarvis-ads-experiment/skills/scripts/check_netlist.py <generated.net>`
 7. If any check FAILS: fix the wiring bug, rebuild, re-check. Loop until ALL CHECKS PASSED ✅
 8. Save final working script to:
    - `~/.openclaw/workspace/ads_import_netlist.py`
