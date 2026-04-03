@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This file instructs Jarvis-EDA to create a narrow-scope sub-agent focused on ADS schematic placement planning for the provided switch example.
+This is the canonical launch template for sub-agents building ADS schematics from .net files.
+Jarvis-EDA must use this template every time a new sub-agent is spawned for net-to-ADS work.
 
 ## Sub-Agent Name
 
@@ -10,67 +11,69 @@ This file instructs Jarvis-EDA to create a narrow-scope sub-agent focused on ADS
 
 ## Mission
 
-Read the existing knowledge and example files, then generate a placement-planning artifact that improves ADS schematic generation quality for the switch example.
+Read all skills, workflows, and context files in this repository first.
+Then build the ADS schematic from the input netlist, verify connectivity, and report results.
 
-The sub-agent should focus on readability, function separation, spacing, and connection safety.
+## Files The Sub-Agent Must Read (in order)
 
-## Files The Sub-Agent Must Read
-
-### Memory
+### 1. Memory (context and scope)
 - `memory/project_goal.md`
 - `memory/current_scope.md`
 - `memory/ads_execution_context.md`
 
-### Skills
+### 2. Skills (rules and geometry)
 - `skills/understand_net_roles.md`
 - `skills/focus_on_ads_schematic_quality.md`
-- `skills/ads_python_interface.md`
-- `skills/ads_pdk_usage.md`
+- `skills/ads_python_interface.md`           ← contains confirmed ADS pin coordinates
+- `skills/ads_pdk_usage.md`                  ← PDK paths, FET sizing, known constraints
 - `skills/ads_component_recognition.md`
-- `skills/ads_schematic_build_limitations.md`
+- `skills/ads_schematic_build_limitations.md` ← silent failure modes, checker is mandatory
 
-### Workflows
+### 3. Workflows
 - `workflows/review_example_net_flow.md`
 - `workflows/ads_import_to_placeplan.md`
 
-### Schema
+### 4. Schema
 - `schemas/placeplan_schema.md`
 
-### Example design files
-- `input/spdt_switch.net`
-- `input/spdt_switch_prep.net`
-- `input/spdt_switch_ads_import.net`
+### 5. Design files
+- `input/spdt_switch.net`            ← original circuit intent
+- `input/spdt_switch_prep.net`       ← functional grouping
+- `input/spdt_switch_ads_import.net` ← PDK logical source (use this for schematic)
+- `input/spdt_switch_placeplan.yaml` ← placement plan (use this for layout decisions)
+
+## Required Build Steps
+
+1. Read all files above
+2. Write a brand-new `ads_import_netlist.py` based on the skills (do not reuse old scripts)
+3. Copy input netlist to `C:\Users\jarvis\AppData\Local\Temp\spdt_switch_ads_import.net`
+4. Copy script to `C:\Users\jarvis\AppData\Local\Temp\ads_import_netlist.py`
+5. Run via ADS Python: `"C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe" C:\Users\jarvis\AppData\Local\Temp\ads_import_netlist.py`
+6. Run connectivity checker: `python ~/openclaw/skills/ads-schematic-checker/scripts/check_netlist.py <generated.net>`
+7. If any check FAILS: fix the wiring bug, rebuild, re-check. Loop until ALL CHECKS PASSED ✅
+8. Save final working script to:
+   - `~/.openclaw/workspace/ads_import_netlist.py`
+   - `~/.openclaw/workspace/jarvis-ads-experiment/input/ads_import_netlist.py`
 
 ## Required Outputs
 
-Create new files only:
-
-- `notes/spdt_switch_placeplan_review.md`
-- `input/spdt_switch_placeplan.yaml`
-
-Do not modify the existing example `.net` files.
+- ADS schematic in `C:\Users\jarvis\ads_projects\spdt_pdk_wrk` → `spdt_switch_lib:spdt_switch:schematic`
+- `input/ads_import_netlist.py` — the working build script
+- Connectivity checker output showing ALL CHECKS PASSED ✅
 
 ## Constraints
 
 The sub-agent must not:
-- redesign the circuit
+- reuse or adapt existing scripts without reading the skills first
+- report success if the connectivity checker has failures
+- redesign the circuit topology
 - change intended connectivity
-- invent a new netlist grammar
-- replace the logical ADS implementation
-- optimize RF performance
-- over-compress the schematic plan
+- simulate directly with CircuitSimulator (PDK models only work in ADS GUI)
 
-The sub-agent should:
-- preserve logical meaning
-- identify the main RF path
-- identify branch and control structure
-- define lanes, ordering, spacing, routing guidance, and anchors
-- optimize for safer and clearer ADS schematic generation
+## ADS Environment
 
-## Execution Order
-
-1. Read the memory, skills, workflows, schema, and example files
-2. Review the example net flow
-3. Create a review note
-4. Create the placeplan yaml
-5. Save outputs as new files only
+- ADS Python: `C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe`
+- ADS dir: `C:\Program Files\Keysight\ADS2026_Update1`
+- Workspace: `C:\Users\jarvis\ads_projects\spdt_pdk_wrk`
+- PDK: `C:\Users\jarvis\ads_projects\design_kits\WIN_PP1029_DESIGN_KIT`
+- WSL note: always copy scripts/netlists to Windows paths before running
