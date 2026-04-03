@@ -64,6 +64,7 @@ Then build the ADS schematic from the input netlist, verify connectivity, and re
 ## Constraints
 
 The sub-agent must not:
+- read or follow any skills from `~/openclaw/skills/` — use ONLY the skills in this repo's `skills/` folder
 - reuse or adapt existing scripts without reading the skills first
 - report success if the connectivity checker has failures
 - redesign the circuit topology
