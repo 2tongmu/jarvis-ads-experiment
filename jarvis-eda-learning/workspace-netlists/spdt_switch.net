@@ -1,0 +1,139 @@
+; ================================================================
+; spdt_switch.net
+; Double series-shunt absorptive SPDT switch -- ideal lumped model
+; GaAs pHEMT, 2-18 GHz, WIN Semi PP1029 process
+;
+; Topology: PATH A active (P1->P2), 2-port representation
+;   Stage 1: Q1a (series ON) + Q3a (shunt OFF/absorptive)
+;   Stage 2: Q1b (series ON) + Q3b (shunt OFF/absorptive)
+;
+; ================================================================
+; PDK SWAP GUIDE -- Keysight ADS + WIN_PP1029_DESIGN_KIT
+; ================================================================
+; Open this schematic in ADS, then replace each FET block:
+;
+;   Series FETs  Q1a, Q1b  (marked below):
+;     Delete: Ron + Ls + Rvia + Lvia block (4 components)
+;     Insert: WIN_PP1029_MS   NOF=2   UGW=80
+;             Port1=drain node, Port2=source node
+;             (total gate periphery = 2 x 80um = 160um)
+;
+;   Shunt FETs   Q3a, Q3b  (marked below):
+;     Delete: Coff + Lsh block (2 components)
+;     Insert: WIN_PP1029_MS   NOF=2   UGW=50
+;             Port1=RF node, Port2=node before R_term
+;             (total gate periphery = 2 x 50um = 100um)
+;     Keep:  Rtrm + Lrt (absorptive termination) unchanged
+;
+;   For 3-port coplanar layout: use WIN_PP1029_CPW instead
+;
+; ================================================================
+
+Options ResourceUsage=yes UseNutmegFormat=no
+
+; -- S-param sweep: 2-18 GHz, 321 points (50 MHz step) ----------
+S_Param:SP1 CalcS=yes CalcY=no CalcZ=no StatusLevel=2 CalcNoise=no \
+SweepVar="freq" SweepPlan="SP1_stim" OutputPlan="SP1_Output"
+
+SweepPlan: SP1_stim Start=2 GHz Stop=18 GHz Step=50 MHz
+
+OutputPlan:SP1_Output \
+      Type="Output" \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2
+
+; -- Ports -------------------------------------------------------
+Port:Term1  P1  0  Num=1  Z=50 Ohm
+Port:Term2  P2  0  Num=2  Z=50 Ohm
+
+; ================================================================
+; INPUT RF PAD
+;   Series: Rpad(0.05 Ohm) + Lpad(10 pH)
+;   Shunt:  Cpad(65 fF) to GND
+; ================================================================
+R:Rpad_in   P1   n1   R=0.05 Ohm
+L:Lpad_in   n1   n2   L=10 pH
+C:Cpad_in   n2   0    C=65 fF
+
+; ================================================================
+; INPUT INTERCONNECT  (pi-model: C/2 | R+L | C/2)
+;   L=120 pH, C=48 fF total (C/2=24 fF each side), R=0.009 Ohm
+; ================================================================
+C:Ci1a  n2   0    C=24 fF
+R:Ri1   n2   n3   R=0.009 Ohm
+L:Li1   n3   n4   L=120 pH
+C:Ci1b  n4   0    C=24 fF
+
+; ================================================================
+; STAGE 1 -- Series FET Q1a (ON state)
+;   Model: Ron(2.50 Ohm) + Ls(50 pH) + Rvia(0.08 Ohm) + Lvia(50 pH)
+;
+;   !! PDK SWAP !!
+;   Replace these 4 lines with: WIN_PP1029_MS  NOF=2  UGW=80
+;   Drain=n4, Source=n8
+; ================================================================
+R:Ron_Q1a   n4   n5   R=2.50 Ohm
+L:Ls_Q1a    n5   n6   L=50 pH
+R:Rvia_Q1a  n6   n7   R=0.08 Ohm
+L:Lvia_Q1a  n7   n8   L=50 pH
+
+; Gate-Cgd feedback Q1a
+;   Cgd(8 fF) series to gate node, then Rg(300 Ohm) || Cpg(12 fF), then Lsg(150 pH) to GND
+C:Cgd_Q1a   n8   ng1  C=8 fF
+R:Rg_Q1a    ng1  ng2  R=300 Ohm
+C:Cpg_Q1a   ng1  ng2  C=12 fF
+L:Lsg_Q1a   ng2  0    L=150 pH
+
+; Shunt FET Q3a (OFF state -- absorptive)
+;   !! PDK SWAP !!
+;   Replace Coff_Q3a + Lsh_Q3a with: WIN_PP1029_MS  NOF=2  UGW=50
+;   Drain=n8, Source=ns2  (keep Rtrm1 + Lrt_Q3a unchanged)
+C:Coff_Q3a  n8   ns1  C=30 fF
+L:Lsh_Q3a   ns1  ns2  L=50 pH
+R:Rtrm1     ns2  ns3  R=47 Ohm
+L:Lrt_Q3a   ns3  0    L=25 pH
+
+; ================================================================
+; STAGE 2 -- Series FET Q1b (ON state)
+;   !! PDK SWAP !!
+;   Replace these 4 lines with: WIN_PP1029_MS  NOF=2  UGW=80
+;   Drain=n8, Source=n12
+; ================================================================
+R:Ron_Q1b   n8   n9   R=2.50 Ohm
+L:Ls_Q1b    n9   n10  L=50 pH
+R:Rvia_Q1b  n10  n11  R=0.08 Ohm
+L:Lvia_Q1b  n11  n12  L=50 pH
+
+; Gate-Cgd feedback Q1b
+C:Cgd_Q1b   n12  ng3  C=8 fF
+R:Rg_Q1b    ng3  ng4  R=300 Ohm
+C:Cpg_Q1b   ng3  ng4  C=12 fF
+L:Lsg_Q1b   ng4  0    L=150 pH
+
+; Shunt FET Q3b (OFF state -- absorptive)
+;   !! PDK SWAP !!
+;   Replace Coff_Q3b + Lsh_Q3b with: WIN_PP1029_MS  NOF=2  UGW=50
+;   Drain=n12, Source=ns5  (keep Rtrm2 + Lrt_Q3b unchanged)
+C:Coff_Q3b  n12  ns4  C=30 fF
+L:Lsh_Q3b   ns4  ns5  L=50 pH
+R:Rtrm2     ns5  ns6  R=47 Ohm
+L:Lrt_Q3b   ns6  0    L=25 pH
+
+; ================================================================
+; OUTPUT INTERCONNECT  (pi-model: C/2 | R+L | C/2)
+; ================================================================
+C:Co1a  n12  0    C=24 fF
+R:Ro1   n12  n13  R=0.009 Ohm
+L:Lo1   n13  n14  L=120 pH
+C:Co1b  n14  0    C=24 fF
+
+; ================================================================
+; OUTPUT RF PAD
+;   Shunt: Cpad(65 fF) to GND
+;   Series: Lpad(10 pH) + Rpad(0.05 Ohm)
+; ================================================================
+C:Cpad_out  n14  0    C=65 fF
+L:Lpad_out  n14  n15  L=10 pH
+R:Rpad_out  n15  P2   R=0.05 Ohm

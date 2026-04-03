@@ -1,0 +1,48 @@
+; ============================================================
+; lpf_demo.net
+; ADS hpeesofsim-compatible netlist
+; Circuit: Ideal 3-element Butterworth Low-Pass Filter
+; Topology: L1 - C1 - L2  (pi-network, series-shunt-series)
+; Reference: LPF_Design_Demo example (ADS 2026)
+;            Generated from ads_run_example.py via netlist translation
+;
+; ADS Netlist Format Rules (SDF / hpeesofsim .net):
+;   - Comments start with semicolon (;)
+;   - Component syntax: <Type>:<name> <node1> <node2> [<nodeN>...] <param>=<value> ...
+;   - Parameters may use unit suffixes: nH, pF, Ohm, GHz, etc.
+;   - Global ground node is "0" (or GND)
+;   - Port/Term component: Term:<name> <node> <GND> Num=<N> Z=<Z>
+;   - S-param controller: S_Param:<name> Start=<f> Stop=<f> Step=<f>
+;   - Sweep units: Hz, kHz, MHz, GHz
+;   - #include pulls in additional .net model files
+; ============================================================
+
+; --- Design parameters ---
+; Cutoff frequency: ~1 GHz (3rd order Butterworth LPF)
+; Source/load impedance: 50 Ohm
+; Component values calculated from Butterworth prototype:
+;   g1=1.0000, g2=2.0000, g3=1.0000  (normalised, 3rd order)
+;   L1 = g1 * Z0 / (2*pi*fc) = 50 / (2*pi*1e9) ~ 7.958 nH
+;   C1 = g2 / (Z0 * 2*pi*fc) = 2 / (50 * 2*pi*1e9) ~ 6.366 pF
+;   L2 = g3 * Z0 / (2*pi*fc)                       ~ 7.958 nH
+
+; --- Netlist ---
+
+; Input port (Term1) — Port 1, 50 Ohm, at node "rf_in"
+Term:Term1  rf_in  0  Num=1  Z=50 Ohm
+
+; Series inductor L1
+L:L1  rf_in  mid  L=7.958 nH
+
+; Shunt capacitor C1 to ground
+C:C1  mid  0  C=6.366 pF
+
+; Series inductor L2
+L:L2  mid  rf_out  L=7.958 nH
+
+; Output port (Term2) — Port 2, 50 Ohm, at node "rf_out"
+Term:Term2  rf_out  0  Num=2  Z=50 Ohm
+
+; --- S-Parameter Simulation Controller ---
+; Sweep: 100 MHz to 5 GHz, 100 MHz step
+S_Param:SP1  Start=0.1 GHz  Stop=5 GHz  Step=0.1 GHz
