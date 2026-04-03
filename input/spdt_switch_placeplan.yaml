@@ -1,6 +1,6 @@
 design:
   name: spdt_switch
-  variant: initial_placeplan
+  variant: v1_optimized
   source_file: input/spdt_switch_ads_import.net
   supporting_files:
     - input/spdt_switch.net
@@ -8,126 +8,258 @@ design:
 
 placement_objective:
   summary: >
-    Generate a readable and safe ADS schematic placement plan for the SPDT switch
-    example. Preserve logical connectivity while improving functional separation,
-    spacing, and connection safety.
+    Generate a readable and safe ADS schematic placement plan for the SPDT switch.
+    Preserve logical connectivity while improving functional separation, spacing,
+    and connection safety. The RF path must be a clean horizontal line left to right.
+    Shunt structures hang downward. Gate bias (when added) hangs upward.
   priorities:
+    - connection_safety_first
     - clear_main_rf_path
-    - separate_control_and_bias_from_rf
-    - reduce_ambiguous_symbol_proximity
+    - separate_shunt_from_rf
+    - separate_gate_bias_from_rf
     - support_deterministic_ads_build
     - preserve_logical_meaning
 
+# Signal path topology (for reference):
+# P1 → PAD_in → INT_in → n4 → Q1a(series) → n8 → Q1b(series) → n12 → INT_out → PAD_out → P2
+#                                                   └ Q3a(shunt)→Rtrm1→Lrt_Q3a→GND
+#                                                                        └ Q3b(shunt)→Rtrm2→Lrt_Q3b→GND
+
 functional_groups:
-  - name: rf_input_group
+
+  - name: input_port_group
     role: input_port
-    members: []
+    members:
+      - Term1
+      - GND_Term1
     lane: rf_main
+    x_region: 0
     anchor_priority: 1
+    notes: Term always needs companion GROUND instance at (x, y-1)
+
+  - name: pad_in_group
+    role: passive_network
+    members:
+      - Rpad_in
+      - Lpad_in
+      - Cpad_in
+    lane: rf_main
+    x_region: 1_to_4
+    anchor_priority: 2
+    notes: >
+      Rpad_in and Lpad_in are series (angle=0). Cpad_in is shunt (angle=-90) tapping
+      node n2 (after Lpad_in). Keep all three visually grouped.
+
+  - name: int_in_group
+    role: tline_pi_model
+    members:
+      - Ci1a
+      - Ri1
+      - Li1
+      - Ci1b
+    lane: rf_main
+    x_region: 4_to_9
+    anchor_priority: 3
+    notes: >
+      Pi-model: Ci1a shunts n2, Ri1+Li1 series, Ci1b shunts n4.
+      Ci1a and Ci1b hang downward (shunt). Series elements on RF line.
 
   - name: switch_core_group
     role: main_switch_core
-    members: []
+    members:
+      - Q1a
+      - Q1b
     lane: rf_main
-    anchor_priority: 2
-
-  - name: upper_branch_group
-    role: rf_branch
-    members: []
-    lane: rf_main
-    anchor_priority: 3
-
-  - name: lower_branch_group
-    role: rf_branch
-    members: []
-    lane: rf_main
+    x_region: 10_to_13
     anchor_priority: 4
+    notes: >
+      Both series FETs placed inline on RF signal path (angle=90).
+      Q1a: drain=n4, source=n8. Q1b: drain=n8, source=n12.
+      Shared node n8 = Q1a source = Q1b drain = Q3a drain.
+      No wire needed between Q1a source and Q1b drain if they coincide at same x,y.
+      Conservative spacing: leave 2 units before Q1a (after INT_in) and after Q1b
+      (before INT_out) so shunt FET wires don't crowd the series FET pins.
 
-  - name: gate_bias_upper_group
-    role: control_bias
-    members: []
-    lane: control_bias
-    anchor_priority: 6
-
-  - name: gate_bias_lower_group
-    role: control_bias
-    members: []
-    lane: control_bias
-    anchor_priority: 7
-
-  - name: shunt_return_group
+  - name: shunt_q3a_group
     role: shunt_ground_support
-    members: []
+    members:
+      - Q3a
+      - Rtrm1
+      - Lrt_Q3a
+      - GND_Q3a
     lane: shunt_ground
+    x_region: at_n8
     anchor_priority: 5
+    notes: >
+      Shunt FET Q3a (angle=0): drain at n8 (same x as Q1a source / Q1b drain),
+      source hangs downward. Rtrm1 and Lrt_Q3a chain below Q3a source to GND.
+      Wire must explicitly connect Q3a source → Rtrm1 P1 → Lrt_Q3a P1 → GND.
+      Each R/L at angle=-90: P1=(x,y), P2=(x,y-1). Chain: source_y=0 → -1 → -2.25 → -3.75 → GND.
+      Gate pin ng_Q3a intentionally floating (GBIAS skipped in this build).
+
+  - name: shunt_q3b_group
+    role: shunt_ground_support
+    members:
+      - Q3b
+      - Rtrm2
+      - Lrt_Q3b
+      - GND_Q3b
+    lane: shunt_ground
+    x_region: at_n12
+    anchor_priority: 6
+    notes: >
+      Same structure as shunt_q3a_group but at node n12.
+      Q3b drain at n12 (same x as Q1b source). Wire explicitly to Rtrm2 → Lrt_Q3b → GND.
+      Gate pin ng_Q3b intentionally floating.
+
+  - name: int_out_group
+    role: tline_pi_model
+    members:
+      - Co1a
+      - Ro1
+      - Lo1
+      - Co1b
+    lane: rf_main
+    x_region: after_n12
+    anchor_priority: 7
+    notes: >
+      Pi-model: Co1a shunts n12, Ro1+Lo1 series, Co1b shunts n14.
+      Co1a must tap n12 — place AFTER Q1b source (not before).
+      Mirror of INT_in.
+
+  - name: pad_out_group
+    role: passive_network
+    members:
+      - Cpad_out
+      - Lpad_out
+      - Rpad_out
+    lane: rf_main
+    x_region: after_int_out
+    anchor_priority: 8
+    notes: >
+      Cpad_out shunts n14 (same tap as Co1b — may share x or use adjacent x).
+      Lpad_out and Rpad_out are series to P2.
+
+  - name: output_port_group
+    role: output_port
+    members:
+      - Term2
+      - GND_Term2
+    lane: rf_main
+    x_region: rightmost
+    anchor_priority: 9
+    notes: Term always needs companion GROUND instance at (x, y-1)
 
   - name: simulation_group
     role: simulation_control
-    members: []
+    members:
+      - SP1
     lane: simulation
-    anchor_priority: 8
+    x_region: above_circuit
+    anchor_priority: 10
+    notes: Place S_Param controller above the RF line, not intersecting any signal path.
 
 lanes:
   - name: rf_main
-    purpose: Main RF signal path lane
+    purpose: Main RF signal path — horizontal, y=0, left to right
     relative_position: center
-
-  - name: control_bias
-    purpose: Control and gate bias lane
-    relative_position: top
+    y_coordinate: 0.0
 
   - name: shunt_ground
-    purpose: Shunt and ground-support lane
-    relative_position: bottom
+    purpose: Shunt FETs and shunt R/L/C chains — hang downward from RF line
+    relative_position: below_rf
+    y_direction: negative  # y decreases downward
+
+  - name: control_bias
+    purpose: Gate bias networks — hang upward from FET gate pins (when enabled)
+    relative_position: above_rf
+    y_direction: positive
+    status: deferred  # GBIAS blocks skipped until FET connections verified
 
   - name: simulation
-    purpose: Simulation and measurement lane
-    relative_position: side
+    purpose: Simulation controller — placed above and to the side of the circuit
+    relative_position: top_center
 
 ordering_constraints:
   - type: left_to_right_rf_flow
-    description: RF input should appear left of switch core and branch outputs to the right
-
-  - type: switch_core_central
-    description: Switch core should be central relative to input and outputs
-
-  - type: branch_visual_separation
-    description: Upper and lower branches should be visually distinct
+    description: >
+      Signal flows left to right: Term1 → PAD_in → INT_in → Q1a → Q1b → INT_out → PAD_out → Term2
+  - type: shunt_below_rf_node
+    description: >
+      Each shunt element hangs downward from its RF tap node.
+      Shunt x-coordinate must exactly match the RF tap node x-coordinate.
+  - type: co1a_after_q1b
+    description: >
+      Co1a must be placed at node n12 which is AFTER Q1b source, not before.
+      Placing it earlier creates a wrong tap and breaks the output pi-model.
+  - type: series_gap_before_fets
+    description: >
+      Leave a 2-unit gap on the RF line before Q1a and after Q1b to give
+      shunt FET wires clear routing space without crowding series FET pins.
 
 spacing_guidance:
   unrelated_group_spacing:
     level: large
+    minimum_units: 2.0
   branch_point_clearance:
     level: large
+    minimum_units: 1.5
+    note: >
+      Node n8 has 3 connections: Q1a source, Q3a drain, Q1b drain.
+      All three must land at exactly the same (x, y) coordinate.
+  shunt_chain_spacing:
+    level: regular
+    between_components: 0.75
+    note: >
+      Shunt R/L chain: each component P2 must reach the next component P1.
+      At angle=-90: place next component at y_prev - 1.0 (for unit-span components).
+      For non-unit R/L, use exact P1/P2 offsets.
   control_to_rf_lane_spacing:
     level: large
   unconnected_pin_clearance:
     level: extra_large
+    note: Floating gate pins (ng_Q*) need clearance so they don't accidentally touch nearby wires.
 
 routing_guidance:
   main_rf_route:
-    style: mostly_horizontal
-  control_route:
-    style: separate_lane_with_vertical_drops
-  shunt_return_route:
-    style: vertical_returns_to_lower_lane
+    style: strictly_horizontal
+    y: 0.0
+    description: All series elements placed on y=0. Wires connect adjacent component pins at y=0.
+  shunt_route:
+    style: vertical_drops_from_rf_node
+    description: >
+      Each shunt element starts at RF node (x, 0) and drops straight down.
+      No diagonal or diagonal-offset wires in shunt paths.
+  simulation_route:
+    style: isolated_above
+    description: S_Param controller placed at y >= 4.0, no wires connecting it to the RF line.
 
 anchor_elements:
-  - rf_input_group
-  - switch_core_group
-  - upper_branch_group
-  - lower_branch_group
-  - simulation_group
+  - input_port_group    # placed first at x=0
+  - switch_core_group   # Q1a and Q1b define the central x-coordinate reference
+  - output_port_group   # placed last, right side
 
 validation_expectations:
-  - main_rf_path_is_visually_clear
-  - branch_structure_is_recognizable
-  - control_and_bias_are_separated_from_rf
-  - unrelated_components_are_not_crowded
-  - placement_plan_preserves_logical_connectivity
+  - no_floating_nodes_in_generated_netlist
+  - Term1_node_appears_in_at_least_2_components
+  - Term2_node_appears_in_at_least_2_components
+  - signal_path_Term1_to_Term2_connected
+  - all_FET_drain_source_pins_in_2_or_more_nets
+  - Rtrm1_P2_connects_to_Lrt_Q3a_P1
+  - Rtrm2_P2_connects_to_Lrt_Q3b_P1
+  - Co1a_taps_n12_not_earlier_node
+  - GND_node_appears_in_many_components
+  - run_ads_schematic_checker_all_pass
 
 review_notes:
-  status: starter_template
-  intended_use: >
-    The sub-agent should fill group members and refine placement guidance based on
-    the actual contents of spdt_switch_ads_import.net.
+  status: optimized_v1
+  optimized_by: jarvis-eda
+  changes_from_starter_template:
+    - filled all group members from actual spdt_switch_ads_import.net
+    - added concrete x_region placement guidance per group
+    - added detailed notes on pin coordinates, wire rules, and common failure modes
+    - added co1a_after_q1b ordering constraint (was missing, causes wrong node tap)
+    - added shunt_chain_spacing with exact y-step rules
+    - added gate pin clearance note
+    - integrated WIN_PP1029_CPW confirmed pin geometry into spacing notes
+    - added mandatory connectivity checker in validation_expectations
