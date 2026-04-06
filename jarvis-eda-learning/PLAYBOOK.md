@@ -11,16 +11,23 @@ Convert a rfscikit-generated `.net` file into a simulation-ready ADS schematic u
 **Script:** `net_prepare.py`
 
 Steps:
-1. Load and validate the input `.net` file using `net_parse.py`
+1. Load PDK config (core file) from `pdk-configs/<PDK_NAME>_core.yaml`
+   - Read `component_map` entries — these define all valid `@PDK_SWAP` targets
+   - Read `ideal_passives` entries — these define `@KEEP` components (no swap)
+   - Read `workspace_setup` rules — used in Stage 3
+   - If config file is missing or unreadable → halt immediately (see CONSTRAINTS.md)
+   - (If a cell lookup is required: load `pdk-configs/<PDK_NAME>_reference.yaml` on demand)
+2. Load and validate the input `.net` file using `net_parse.py`
    - Confirm all nodes, component references, and port definitions are present
    - Flag any unrecognized component types — do not proceed if critical components are unrecognized
-2. Build connectivity graph using `net_graph_utils.py`
+3. Build connectivity graph using `net_graph_utils.py`
    - Identify backbone (signal path) vs. shunt/bias groups
    - Flag floating nodes or disconnected components
-3. Annotate each component with `@PDK_SWAP` tag based on PDK mapping provided
-   - Exact match → annotate directly
+4. Annotate each component with `@PDK_SWAP` or `@KEEP` tag using `component_map` from config
+   - Exact match in `component_map` → annotate with `@PDK_SWAP`
+   - Match in `ideal_passives` → annotate with `@KEEP`
    - No match found → flag component, log to MEMORY.md, escalate to orchestrator before continuing
-4. Output: `<circuit_name>_prep.net`
+5. Output: `<circuit_name>_prep.net`
 
 **Decision Rules:**
 - If >20% of components have no PDK match → pause entire stage, report to orchestrator
@@ -55,25 +62,33 @@ Steps:
 **Scripts:** `ads_placeplan_generate.py` → `ads_placeplan_to_ads.py`
 
 Steps:
-1. Generate placement plan from `<circuit_name>_ads_import.net`
+1. Load PDK config (core file) `pdk-configs/<PDK_NAME>_core.yaml`
+   - Read `placement_recipes` for FET placement formulas (series / shunt orientation)
+   - Read `pin_offsets` for the active FET cell — use these for wire endpoint calculations
+   - Read `workspace_setup` rules — apply when creating the ADS workspace
+2. Generate placement plan from `<circuit_name>_ads_import.net`
    - Assign spatial coordinates to each component following `placeplan-concepts.md`
+   - Apply `placement_recipes` from config for PDK FET components
    - Group by backbone vs. shunt based on graph from Stage 1
    - Output: `<circuit_name>_placeplan.yaml`
-2. Convert placement plan to deterministic build coordinates
+3. Convert placement plan to deterministic build coordinates
    - Output: `<circuit_name>_ads_buildplan.yaml`
-3. Execute ADS schematic build using `ads_build_spdt.py` or equivalent builder script
-   - Place components at specified coordinates
+4. Execute ADS schematic build using the appropriate builder script
+   - Create workspace using `ads_create_pdk_workspace.py` with config `workspace_setup` rules
+   - Place PDK FET components using `ads_lib` / `ads_cell` from config `component_map`
+   - Place ideal passives using `ads_lib` / `ads_cell` from config `ideal_passives`
+   - Use `pin_offsets` from config (not hardcoded values) for wire endpoint coordinates
    - Draw wires per connectivity graph
-   - Assign PDK cell properties to each component
-4. Run post-build connectivity verification using `ads-schematic-checker` skill
+5. Run post-build connectivity verification using `ads-schematic-checker` skill
    - Confirm netlist-to-schematic match
    - Flag any missing connections or extra stubs
-5. Mark schematic as simulation-ready if checker passes
+6. Mark schematic as simulation-ready if checker passes
 
 **Decision Rules:**
 - Checker fails → do not mark as simulation-ready, log failures to MEMORY.md, report to orchestrator
 - Checker passes with warnings → mark simulation-ready, include warnings in status report
 - ADS API error during build → pause, save build step and last successful coordinate to MEMORY.md
+- FET cell name from config not found in ADS library → halt, report (do not guess alternate names)
 
 ---
 
