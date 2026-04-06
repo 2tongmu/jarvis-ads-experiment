@@ -17,6 +17,7 @@ Additions require human approval (per IMPROVEMENT.md — this file is frozen).
 | `ads_placeplan_generate.py` | Stage 3 | Generate schematic placement plan → `_placeplan.yaml` |
 | `ads_placeplan_to_ads.py` | Stage 3 | Convert placeplan → deterministic build coordinates → `_ads_buildplan.yaml` |
 | `ads_build_spdt_pdk.py` | Stage 3 | Build SPDT switch ADS schematic with WIN_PP1029 PDK FETs |
+| `ads_build_lpf_demo.py` | Stage 3 | Build ideal passives-only LPF schematic into existing workspace |
 
 ---
 

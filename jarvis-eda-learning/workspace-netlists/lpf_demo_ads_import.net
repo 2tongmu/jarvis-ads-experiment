@@ -1,0 +1,40 @@
+; ====================================================================
+; lpf_demo_ads_import.net
+; Generated from: lpf_demo_prep.net
+; Pipeline stage: 2 of 3  (prepared .net -> ADS import .net)
+; PDK: WIN_PP1029_core.yaml (core only)
+; Run: 2026-04-06  (Run 2)
+;
+; Circuit: Ideal 3rd-order Butterworth Low-Pass Filter (~1 GHz, 50 Ohm)
+; Topology: Term1 -- L1 -- [C1 shunt] -- L2 -- Term2
+;
+; Component translation (passives-only, all @KEEP):
+;   L:L1  -> ads_rflib:L  (ideal inductor, no PDK swap)
+;   C:C1  -> ads_rflib:C  (ideal capacitor, no PDK swap)
+;   L:L2  -> ads_rflib:L  (ideal inductor, no PDK swap)
+;
+; ADS netlist format notes:
+;   - Port: Term:<name>  <rf_node>  <gnd_node>  Num=<N>  Z=<Z>
+;   - Inductor: L:<name>  <node1>  <node2>  L=<value>
+;   - Capacitor: C:<name>  <node1>  <node2>  C=<value>
+;   - S-param controller: S_Param:<name>  Start=<f>  Stop=<f>  Step=<f>
+;   - Ground node: 0
+; ====================================================================
+;
+; -- SP1  [SIM_CTRL]  S-parameter sweep 100 MHz to 5 GHz 100 MHz step
+S_Param:SP1  Start=0.1 GHz  Stop=5 GHz  Step=0.1 GHz
+;
+; -- Term1  [PORT]  RF input port P1, 50 Ohm
+Term:Term1  rf_in  0  Num=1  Z=50 Ohm
+;
+; -- L1  [INDUCTOR]  Series inductor L1, 7.958 nH (ads_rflib:L, @KEEP)
+L:L1  rf_in  mid  L=7.958 nH
+;
+; -- C1  [CAPACITOR]  Shunt capacitor C1, 6.366 pF (ads_rflib:C, @KEEP)
+C:C1  mid  0  C=6.366 pF
+;
+; -- L2  [INDUCTOR]  Series inductor L2, 7.958 nH (ads_rflib:L, @KEEP)
+L:L2  mid  rf_out  L=7.958 nH
+;
+; -- Term2  [PORT]  RF output port P2, 50 Ohm
+Term:Term2  rf_out  0  Num=2  Z=50 Ohm

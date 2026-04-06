@@ -1,0 +1,58 @@
+; ====================================================================
+; lpf_demo_prep.net
+; Prepared from: lpf_demo.net
+; Pipeline stage: 1 of 3  (raw .net -> prepared .net -> ADS schematic)
+; PDK config: WIN_PP1029_core.yaml (core only, as instructed)
+; Run: 2026-04-06  (Run 2)
+;
+; @BLOCK / @PDK_SWAP tag guide for ads_import_netlist.py:
+;   @BLOCK      -- groups ideal components into one logical device
+;   @PDK_SWAP   -- instructs the parser to replace this block with a PDK cell
+;   @KEEP       -- instructs the parser to keep these ideal components as-is
+;   @END_BLOCK  -- closes the block
+;
+; Annotation summary:
+;   All components are type R, L, or C.
+;   Per ideal_passives in WIN_PP1029_core.yaml:
+;     L -> @KEEP  (ads_rflib:L)
+;     C -> @KEEP  (ads_rflib:C)
+;   Ports and sim controller -> @KEEP (no PDK swap applicable)
+;   No FET components found -> no @PDK_SWAP needed.
+;   Phase 1 stop criterion: passives-only circuit, all @KEEP.
+; ====================================================================
+;
+; @BLOCK  name=SP1  type=SIM_CTRL  desc="S-parameter sweep 100 MHz to 5 GHz"
+;   @KEEP  components=SP1
+S_Param:SP1  Start=0.1 GHz  Stop=5 GHz  Step=0.1 GHz
+; @END_BLOCK name=SP1
+;
+; @BLOCK  name=Term1  type=PORT  desc="RF input port P1, 50 Ohm"
+;   @KEEP  components=Term1
+Term:Term1  rf_in  0  Num=1  Z=50 Ohm
+; @END_BLOCK name=Term1
+;
+; @BLOCK  name=L1  type=INDUCTOR  desc="Series inductor L1, 7.958 nH (Butterworth g1)"
+;   @KEEP  components=L1  ads_lib=ads_rflib  ads_cell=L
+;   Physical meaning: first series arm of 3rd-order Butterworth LPF
+;   No PDK swap -- ideal element per ideal_passives config
+L:L1  rf_in  mid  L=7.958 nH
+; @END_BLOCK name=L1
+;
+; @BLOCK  name=C1  type=CAPACITOR  desc="Shunt capacitor C1, 6.366 pF (Butterworth g2)"
+;   @KEEP  components=C1  ads_lib=ads_rflib  ads_cell=C
+;   Physical meaning: shunt arm of 3rd-order Butterworth LPF (mid to GND)
+;   No PDK swap -- ideal element per ideal_passives config
+C:C1  mid  0  C=6.366 pF
+; @END_BLOCK name=C1
+;
+; @BLOCK  name=L2  type=INDUCTOR  desc="Series inductor L2, 7.958 nH (Butterworth g3)"
+;   @KEEP  components=L2  ads_lib=ads_rflib  ads_cell=L
+;   Physical meaning: second series arm of 3rd-order Butterworth LPF
+;   No PDK swap -- ideal element per ideal_passives config
+L:L2  mid  rf_out  L=7.958 nH
+; @END_BLOCK name=L2
+;
+; @BLOCK  name=Term2  type=PORT  desc="RF output port P2, 50 Ohm"
+;   @KEEP  components=Term2
+Term:Term2  rf_out  0  Num=2  Z=50 Ohm
+; @END_BLOCK name=Term2

@@ -13,6 +13,8 @@ This file serves two roles depending on agent lifecycle phase:
 [SCRIPT-ADDED] ads_create_pdk_workspace.py: Create ADS workspace with PDK loaded via lib.defs INCLUDE — replaces 5-turn exploration of workspace + PDK setup sequence.
 [SCRIPT-ADDED] ads_query_pdk_cells.py: List all cells in ADS PDK library with views and params — replaces manual AEL/directory decoding to find correct API cell name.
 [SCRIPT-ADDED] ads_probe_fet_pins.py: Probe PDK component pin snap_point offsets at any angle — replaces 4-turn exploration of InstTerm API to find pin coordinate method.
+[SCRIPT-ADDED] ads_build_lpf_demo.py: Build ideal passives-only LPF schematic into existing workspace — validates reuse pattern (open_workspace not create) for multi-cell projects.
+[RULE-GRADUATED] Reusing existing workspace: de.open_workspace(str(WRK_DIR)) works cleanly when workspace already exists. Cell dir cleanup (shutil.rmtree cell_dir) before rebuild prevents stale-cell errors. vtb.defs syntax warning is benign — suppress with warnings.catch_warnings().
 
 ---
 
@@ -58,6 +60,13 @@ Example format when populated:
 spdt_switch (2-stage SPDT, 2–18 GHz) | PDK: WIN_PP1029_DESIGN_KIT | Outcome: success | Stage: 3
 Key decisions: GBIAS stubs (10kΩ→GND); Series FETs angle=90; Shunt FETs angle=0; pin offsets probed via snap_point.
 Result: ALL CHECKS PASSED ✅ (Phase 1 — schematic gen). 5 output artifacts. Ready for Phase 2 sign-off.
+
+### Run 2 — 2026-04-06
+lpf_demo (3rd-order Butterworth LPF, passives-only) | PDK config: WIN_PP1029_core.yaml (core only) | Outcome: success | Stage: 3 complete
+Added schematic cell lpf_demo:schematic to existing spdt_switch_pdk_wrk (workspace reuse — no recreate).
+All components @KEEP (L→ads_rflib:L, C→ads_rflib:C). Zero FET PDK swaps. Checker: ALL CHECKS PASSED ✅
+Artifacts: lpf_demo_prep.net, lpf_demo_ads_import.net, lpf_demo_placeplan.yaml, lpf_demo_ads_buildplan.yaml, lpf_demo_ads_generated.net
+[PHASE-COMPLETE] Phase 1 criterion met for lpf_demo. Awaiting human sign-off to advance to Phase 2.
 
 ---
 
@@ -128,6 +137,24 @@ first_discovered: "2026-04-06 Run 1 — PP1029_CPW_PDK RuntimeError triggered ce
 validated_on: ["2026-04-06 spdt_switch Phase 1"]
 cost_before: "~6 turns (directory decoding, AEL inspection, cell enumeration)"
 cost_after: "1 script run → correct cell name immediately"
+
+---
+task: "Build passives-only schematic into existing ADS workspace (multi-cell project)"
+type: script
+script_name: ads_build_lpf_demo.py
+procedure_summary: >
+  Pattern for adding a new schematic cell to an existing workspace (not recreating it).
+  Key sequence: de.open_workspace() (not create), check if lib already registered,
+  delete old cell dir with shutil.rmtree before rebuild, then create_schematic + build.
+  vtb.defs warning is benign — suppress with warnings.catch_warnings().
+  Confirmed working for passives-only circuits (L, C, Term, S_Param) in ads_rflib / ads_simulation.
+  Pin coordinates validated: L angle=0 P1=(x,y) P2=(x+1,y); C angle=-90 P1=(x,y) P2=(x,y-1).
+inputs: "Existing ADS workspace dir, lib name, cell name, buildplan coordinates"
+outputs: "New schematic cell; ADS-generated netlist (_ads_generated.net)"
+first_discovered: "2026-04-06 Run 2 (lpf_demo, passives-only)"
+validated_on: ["2026-04-06 lpf_demo Phase 1 — ALL CHECKS PASSED"]
+cost_before: "Would require workspace creation logic and PDK injection each time"
+cost_after: "open_workspace + add_library check + build — clean and fast"
 
 ---
 task: "Probe PDK component pin positions (snap_point coordinates)"
