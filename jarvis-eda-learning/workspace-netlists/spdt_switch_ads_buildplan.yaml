@@ -1,0 +1,96 @@
+design:
+  name: spdt_switch
+  variant: auto_generated_placeplan
+  source_file: ../workspace-netlists/spdt_switch_ads_import.net
+instances:
+- name: 'SweepPlan:'
+  x: 0
+  y: 260
+- name: S_Param:SP1
+  x: 240
+  y: 0
+- name: Port:Term1
+  x: 360
+  y: 0
+- name: Port:Term2
+  x: 480
+  y: 0
+- name: R:Rpad_in
+  x: 600
+  y: 0
+- name: L:Lpad_in
+  x: 720
+  y: 0
+- name: C:Cpad_in
+  x: 840
+  y: 0
+- name: C:Ci1a
+  x: 960
+  y: 0
+- name: R:Ri1
+  x: 1080
+  y: 0
+- name: L:Li1
+  x: 1200
+  y: 0
+- name: C:Ci1b
+  x: 1320
+  y: 0
+- name: '"PP1029_CPW_PDK":Q1a'
+  x: 1440
+  y: 0
+- name: '"PP1029_CPW_PDK":Q3a'
+  x: 1560
+  y: 0
+- name: R:Rtrm1
+  x: 1680
+  y: 0
+- name: L:Lrt_Q3a
+  x: 1800
+  y: 0
+- name: '"PP1029_CPW_PDK":Q1b'
+  x: 1920
+  y: 0
+- name: '"PP1029_CPW_PDK":Q3b'
+  x: 2040
+  y: 0
+- name: R:Rtrm2
+  x: 2160
+  y: 0
+- name: L:Lrt_Q3b
+  x: 2280
+  y: 0
+- name: C:Co1a
+  x: 2400
+  y: 0
+- name: R:Ro1
+  x: 2520
+  y: 0
+- name: L:Lo1
+  x: 2640
+  y: 0
+- name: C:Co1b
+  x: 2760
+  y: 0
+- name: C:Cpad_out
+  x: 2880
+  y: 0
+- name: L:Lpad_out
+  x: 3000
+  y: 0
+- name: R:Rpad_out
+  x: 3120
+  y: 0
+routing_guidance:
+  main_rf_route:
+    style: mostly_horizontal
+  control_route:
+    style: separate_lane_with_vertical_drops
+  shunt_return_route:
+    style: vertical_returns_to_lower_lane
+anchor_elements: []
+validation_expectations:
+- main_rf_path_is_visually_clear
+- control_and_bias_are_separated_from_rf
+- unrelated_components_are_not_crowded
+- placement_plan_preserves_logical_connectivity

@@ -1,0 +1,94 @@
+design:
+  name: spdt_switch
+  variant: auto_generated_placeplan
+  source_file: ../workspace-netlists/spdt_switch_ads_import.net
+placement_objective:
+  summary: Auto-generated starter placeplan from ADS import netlist.
+  priorities:
+  - clear_main_rf_path
+  - separate_control_and_bias_from_rf
+  - reduce_ambiguous_symbol_proximity
+  - support_deterministic_ads_build
+  - preserve_logical_meaning
+functional_groups:
+- name: simulation_group
+  role: simulation_control
+  members:
+  - 'SweepPlan:'
+  lane: simulation
+  anchor_priority: 6
+- name: support_group
+  role: support_misc
+  members:
+  - S_Param:SP1
+  - Port:Term1
+  - Port:Term2
+  - R:Rpad_in
+  - L:Lpad_in
+  - C:Cpad_in
+  - C:Ci1a
+  - R:Ri1
+  - L:Li1
+  - C:Ci1b
+  - '"PP1029_CPW_PDK":Q1a'
+  - '"PP1029_CPW_PDK":Q3a'
+  - R:Rtrm1
+  - L:Lrt_Q3a
+  - '"PP1029_CPW_PDK":Q1b'
+  - '"PP1029_CPW_PDK":Q3b'
+  - R:Rtrm2
+  - L:Lrt_Q3b
+  - C:Co1a
+  - R:Ro1
+  - L:Lo1
+  - C:Co1b
+  - C:Cpad_out
+  - L:Lpad_out
+  - R:Rpad_out
+  lane: rf_main
+  anchor_priority: 7
+lanes:
+- name: rf_main
+  purpose: Main RF signal path lane
+  relative_position: center
+- name: control_bias
+  purpose: Control and bias lane
+  relative_position: top
+- name: shunt_ground
+  purpose: Shunt and ground-support lane
+  relative_position: bottom
+- name: simulation
+  purpose: Simulation lane
+  relative_position: side
+ordering_constraints:
+- type: left_to_right_rf_flow
+  description: Use left-to-right ordering for the main RF backbone.
+- type: control_near_driven_blocks
+  description: Keep control groups near driven active blocks but off the RF lane.
+spacing_guidance:
+  unrelated_group_spacing:
+    level: large
+  branch_point_clearance:
+    level: large
+  control_to_rf_lane_spacing:
+    level: large
+  unconnected_pin_clearance:
+    level: extra_large
+routing_guidance:
+  main_rf_route:
+    style: mostly_horizontal
+  control_route:
+    style: separate_lane_with_vertical_drops
+  shunt_return_route:
+    style: vertical_returns_to_lower_lane
+anchor_elements: []
+validation_expectations:
+- main_rf_path_is_visually_clear
+- control_and_bias_are_separated_from_rf
+- unrelated_components_are_not_crowded
+- placement_plan_preserves_logical_connectivity
+review_notes:
+  status: auto_generated
+  inferred_backbone: []
+  parser_note: Backbone and groups were inferred heuristically. Review before ADS
+    build.

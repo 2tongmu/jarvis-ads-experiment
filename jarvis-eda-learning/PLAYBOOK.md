@@ -74,6 +74,20 @@ Steps:
 
 ---
 
+### Stage 4 — Post-Run Debrief (Every Run)
+No scripts. Agent reasoning only.
+
+1. Review this run's tool call sequence
+2. Identify any step where the agent had to search, try multiple
+   approaches, or reason for more than 2 turns before acting
+3. For each identified step apply the Post-Run Lesson Learned Protocol
+   in IMPROVEMENT.md
+4. Update MEMORY.md Section 7 with each discovery
+5. Update SKILLS.md if new scripts were created
+6. Then yield
+
+---
+
 ## Escalation Triggers
 | Condition | Action |
 |---|---|

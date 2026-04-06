@@ -49,6 +49,34 @@ A single failure is a log entry. A pattern is an improvement trigger.
 
 ---
 
+## Post-Run Lesson Learned Protocol
+
+After every experiment run, before yielding, the agent must:
+
+1. Identify any task that required search, exploration, or multi-step
+   reasoning to figure out (not just execute)
+2. For each such task, decide:
+   - Can this be fully scripted? → create a new .py script
+   - Partially scriptable? → create a .py script for the repeatable part,
+     document the remainder in MEMORY.md
+   - Not scriptable? → document fully in MEMORY.md as a procedure note
+3. New scripts go in:
+   workspace/jarvis-ads-experiment/jarvis-eda-learning/workspace-scripts/
+4. Name scripts descriptively, e.g.:
+   ads_create_project.py, ads_import_pdk.py, ads_configure_sim.py
+5. Each new script must include a header comment block:
+   # Created by: net-to-ads agent
+   # Run: [date]
+   # Purpose: [one line]
+   # Inputs: [what it expects]
+   # Outputs: [what it produces]
+   # Replaces: [what manual reasoning steps this eliminates]
+6. After creating a script, add it to SKILLS.md under available scripts
+   and log it in MEMORY.md Section 1 as:
+   [SCRIPT-ADDED] <scriptname>: <one line purpose>
+
+---
+
 ## Improvement Process — How to Make a Change
 
 ### Step 1 — Identify

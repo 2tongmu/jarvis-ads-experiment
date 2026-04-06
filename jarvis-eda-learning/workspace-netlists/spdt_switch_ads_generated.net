@@ -1,0 +1,46 @@
+; Top Design: "spdt_switch_pdk_lib:spdt_switch:schematic"
+; Netlisted using Hierarchy Policy: "Standard"
+
+Options ResourceUsage=yes UseNutmegFormat=no EnableOptim=no TopDesignName="spdt_switch_pdk_lib:spdt_switch:schematic" DcopOutputNodeVoltages=yes DcopOutputPinCurrents=yes DcopOutputAllSweepPoints=no DcopOutputDcopType=0
+Port:Term1  N__1 0 Num=1 Z=50 Ohm Noise=yes 
+Port:Term2  N__0 0 Num=2 Z=50 Ohm Noise=yes 
+R:Rpad_in  N__1 N__3 R=0.05 Ohm Noise=yes 
+L:Lpad_in  N__3 N__8 L=10 pH Noise=yes  
+C:Cpad_in  N__8 0 C=65 fF 
+C:Ci1a  N__8 0 C=24 fF 
+R:Ri1  N__8 N__7 R=0.009 Ohm Noise=yes 
+L:Li1  N__7 N__10 L=120 pH Noise=yes  
+C:Ci1b  N__10 0 C=24 fF 
+"PP1029_CPW_PDK":Q1a  N__4 N__10 N__15 NOF=2 UGW=80 um Temp=25 NOISE=1 S_Deb=1 
+R:Rg_Q1a_stub  N__4 0 R=10000 Ohm Noise=yes 
+"PP1029_CPW_PDK":Q3a  N__13 N__15 N__11 NOF=2 UGW=50 um Temp=25 NOISE=1 S_Deb=1 
+R:Rg_Q3a_stub  N__13 0 R=10000 Ohm Noise=yes 
+R:Rtrm1  N__11 N__6 R=47 Ohm Noise=yes 
+L:Lrt_Q3a  N__6 0 L=25 pH Noise=yes  
+"PP1029_CPW_PDK":Q1b  N__17 N__15 N__12 NOF=2 UGW=80 um Temp=25 NOISE=1 S_Deb=1 
+R:Rg_Q1b_stub  N__17 0 R=10000 Ohm Noise=yes 
+"PP1029_CPW_PDK":Q3b  N__5 N__12 N__18 NOF=2 UGW=50 um Temp=25 NOISE=1 S_Deb=1 
+R:Rg_Q3b_stub  N__5 0 R=10000 Ohm Noise=yes 
+R:Rtrm2  N__18 N__14 R=47 Ohm Noise=yes 
+L:Lrt_Q3b  N__14 0 L=25 pH Noise=yes  
+C:Co1a  N__12 0 C=24 fF 
+R:Ro1  N__12 N__16 R=0.009 Ohm Noise=yes 
+L:Lo1  N__16 N__21 L=120 pH Noise=yes  
+C:Co1b  N__21 0 C=24 fF 
+C:Cpad_out  N__21 0 C=65 fF 
+L:Lpad_out  N__21 N__24 L=10 pH Noise=yes  
+R:Rpad_out  N__24 N__0 R=0.05 Ohm Noise=yes 
+S_Param:SP1 CalcS=yes CalcY=no CalcZ=no GroupDelayAperture=1e-4 FreqConversion=no FreqConversionPort=1 StatusLevel=2 CalcNoise=no SortNoise=0 BandwidthForNoise=1.0 Hz DevOpPtLevel=0 SPSS_WSP=yes \
+SweepVar="freq" SweepPlan="SP1_stim" OutputPlan="SP1_Output" 
+
+SweepPlan: SP1_stim Start=2 GHz Stop=18 GHz Step=50 MHz 
+
+OutputPlan:SP1_Output \
+      Type="Output" \
+      UseEquationNestLevel=yes \
+      EquationNestLevel=2 \
+      UseSavedEquationNestLevel=yes \
+      SavedEquationNestLevel=2
+
+#load "python","LinearCollapse"
+Component Module="LinearCollapse" Type="ModelExtractor" NetworkRepresentation=2
