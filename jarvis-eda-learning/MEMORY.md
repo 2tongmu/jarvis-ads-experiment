@@ -55,57 +55,9 @@ Example format when populated:
 *(Raw per-run entries during development. Messy is acceptable here.)*
 
 ### Run 1 — 2026-04-06
-Circuit: spdt_switch (2-stage SPDT, 2–18 GHz)
-PDK: WIN_PP1029_DESIGN_KIT
-Outcome: success
-Stage reached: 3
-
-Issues encountered:
-- Initial FET cell reference `PP1029_CPW_PDK` did not resolve in the ADS Python API.
-  The correct cell name in WIN_PP1029_DESIGN_KIT is `WIN_PP1029_CPW` (with `symbol` view).
-  The generated netlist uses `PP1029_CPW_PDK` as the model identifier (PDK internal).
-- `InstTerm.position` attribute does not exist in this ADS Python version.
-  Used `inst_pin.snap_point` via `get_inst_term_iter()` → `inst_pins` to probe pin positions.
-  Ultimately used analytically computed pin offsets based on snap_point data.
-
-Decisions made:
-- GBIAS networks for all 4 FETs (Q1a, Q3a, Q1b, Q3b) replaced with 10 kΩ gate stubs to GND.
-  This is consistent with GBIAS_SKIPPED markers in _ads_import.net.
-- Series FETs placed at angle=90 (drain left, source right, gate below).
-  Shunt FETs placed at angle=0 (drain top, source below, gate left).
-- All FET pin offsets hard-coded after verification via ADS Python snap_point probe.
-
-What to improve:
-- Consider adding a helper that auto-probes snap_point positions at build time for robustness
-  across PDK versions (currently hard-coded from a known-good probe run).
-
-[PHASE-COMPLETE] — 2026-04-06
-Phase: 1 (Schematic Generation)
-Checker result: ALL CHECKS PASSED ✅
-  - No floating nodes
-  - Signal path Term1→Term2 connected (2 hops)
-  - All 4 PDK FETs connected
-  - GND node in 14 components
-Outputs confirmed:
-  - spdt_switch_prep.net         ✅
-  - spdt_switch_ads_import.net   ✅
-  - spdt_switch_placeplan.yaml   ✅
-  - spdt_switch_ads_buildplan.yaml ✅
-  - spdt_switch_ads_generated.net ✅ (46 lines)
-ADS workspace: C:\Users\jarvis\ads_projects\spdt_switch_pdk_wrk
-Awaiting human sign-off to advance to Phase 2 (simulation).
-
-Entry format:
-```
-### Run [N] — [date]
-Circuit: 
-PDK:
-Outcome: success | partial | failed
-Stage reached: 1 | 2 | 3
-Issues encountered:
-Decisions made:
-What to improve:
-```
+spdt_switch (2-stage SPDT, 2–18 GHz) | PDK: WIN_PP1029_DESIGN_KIT | Outcome: success | Stage: 3
+Key decisions: GBIAS stubs (10kΩ→GND); Series FETs angle=90; Shunt FETs angle=0; pin offsets probed via snap_point.
+Result: ALL CHECKS PASSED ✅ (Phase 1 — schematic gen). 5 output artifacts. Ready for Phase 2 sign-off.
 
 ---
 
