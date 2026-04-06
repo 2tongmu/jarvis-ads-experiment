@@ -1,15 +1,9 @@
-# WIN_PP1029.yaml
-# PDK configuration for WIN Semi PP1029 GaAs pHEMT process
+# WIN_PP1029_core.yaml
+# PDK configuration for WIN Semi PP1029 GaAs pHEMT process (core load file)
 #
-# Source knowledge:
-#   - SKILLS.md (pin offset table, verified 2026-04-06)
-#   - MEMORY.md Section 2 (Run 1 failure modes and mitigations)
-#   - ads_probe_fet_pins.py output (snap_point probing, Run 1)
-#   - ads_query_pdk_cells.py output (72-cell enumeration, Run 1)
-#
-# Usage: Pass this file path to net-to-ads agent at invocation.
-#   The agent loads this file at Stage 1 and uses it for all PDK
-#   mappings, cell references, and pin offsets through Stages 1-3.
+# Usage: Load this file at every session start (Stage 1, Step 1).
+#   Contains essential PDK identity, component mappings, pin offsets, and placement rules.
+#   For full cell enumeration/lookup reference, see WIN_PP1029_reference.yaml (on-demand).
 
 # ── PDK identity ─────────────────────────────────────────────────────────────
 
@@ -17,9 +11,6 @@ pdk_name: WIN_PP1029_DESIGN_KIT
 pdk_lib_name: WIN_PP1029_DESIGN_KIT       # ADS Python API library name (workspace.open_library())
 pdk_lib_path: "C:\\Users\\jarvis\\ads_projects\\design_kits\\WIN_PP1029_DESIGN_KIT"
 pdk_lib_defs: "C:\\Users\\jarvis\\ads_projects\\design_kits\\WIN_PP1029_DESIGN_KIT\\lib.defs"
-process: GaAs pHEMT
-foundry: WIN Semiconductors
-validated_on: ["2026-04-06 spdt_switch Phase 1"]
 
 # ── Workspace setup rules ────────────────────────────────────────────────────
 # These rules are required for this PDK to load correctly in ADS.
@@ -209,52 +200,3 @@ placement_recipes:
       gate:   "(node_x - 0.5, -0.5)"    # left of signal tap, below signal line
       drain:  "(node_x,        0.0)"     # signal tap
       source: "(node_x,       -1.0)"     # to Rtrm → GND chain
-
-# ── Known cells (full list from ads_query_pdk_cells.py, Run 1) ───────────────
-# 72 cells total in WIN_PP1029_DESIGN_KIT library.
-# Only cells with symbol views are listed here (schematic-placeable).
-
-known_cells_with_symbol:
-  - PP1029_BVIA
-  - PP1029_bv2t
-  - PP1029_GND
-  - PP1029_mcfil
-  - PP1029_mclin
-  - PP1029_mcorn
-  - PP1029_mcross
-  - PP1029_mcurve
-  - PP1029_mlang
-  - PP1029_mlcrnr2
-  - PP1029_mlin
-  - PP1029_msabnd
-  - PP1029_mstep
-  - PP1029_mtaper
-  - PP1029_mtee
-  - PP1029_TFR
-  - PP1029_TFR_Slim
-  - PP1029_VIA_M1_M2
-  - PP1029_ProcVar
-  - PP1029_IND_ROUND_EM
-  - PP1029_SSIND
-  - WIN_PP1029_MS
-  - WIN_PP1029_CPW              # primary switch FET — see component_map above
-  - WIN_PP1029_MS_HF
-  - WIN_PP1029_CPW_HF
-  - WIN_PP1029_CPW_J0072
-  - WIN_PP1029_CPW_N0122
-  - WIN_PP1029_CPW_N0132
-  - WIN_PP1029_SD
-  - WIN_PP1029_FGD
-  - WIN_PP1029_PND
-  - PP1029_MSR
-  - PP1029_MIM_CAP
-  - PP1029_MIM_CAP_Custom
-  - PP1029_COV
-  - PP1029_BRIDGE
-  - WIN_PP1029_DSW_S
-  - PP1029_MCRSOVER
-  - PP1029_PAD
-  - PP1029_PAD_RF
-  - PP1029_HOTVIA
-  - PP1029_SOIND
-  - PP1029_Bump

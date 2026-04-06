@@ -49,17 +49,18 @@ On hard limit pause, save to MEMORY.md:
 
 ## PDK Config Requirement
 
-A PDK config file path (`pdk-configs/<PDK_NAME>.yaml`) is **mandatory** before any pipeline work begins.
+A PDK config (core file) path (`pdk-configs/<PDK_NAME>_core.yaml`) is **mandatory** before any pipeline work begins.
 
 | Condition | Action |
 |---|---|
-| PDK config path provided and file exists | Proceed with Stage 1 |
-| PDK config path provided but file not found | Halt at Stage 1 — report exact path that was checked, request correction |
-| No PDK config path provided at invocation | Halt at Stage 1 — do not infer, guess, or use hardcoded PDK knowledge. Report: "PDK config file required. Provide path to pdk-configs/<PDK_NAME>.yaml before proceeding." |
-| Config file missing required sections (`component_map`, `pin_offsets`, `workspace_setup`) | Halt at Stage 1 — list the missing sections, request a corrected config |
+| PDK core config path provided and file exists | Proceed with Stage 1 |
+| PDK core config path provided but file not found | Halt at Stage 1 — report exact path that was checked, request correction |
+| No PDK config path provided at invocation | Halt at Stage 1 — do not infer, guess, or use hardcoded PDK knowledge. Report: "PDK config file required. Provide path to pdk-configs/<PDK_NAME>_core.yaml before proceeding." |
+| Core config file missing required sections (`component_map`, `pin_offsets`, `workspace_setup`) | Halt at Stage 1 — list the missing sections, request a corrected config |
+| Reference config file (`<PDK_NAME>_reference.yaml`) needed but not found | Warn, continue — reference is on-demand only; lookup will fail with clear error if actually required |
 
 **The agent must not substitute hardcoded PDK knowledge (e.g. from MEMORY.md or prior runs)
-for a missing config file. Each run must load its PDK from the config.**
+for a missing config file. Each run must load its PDK from the config files.**
 
 ---
 

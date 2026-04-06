@@ -33,7 +33,7 @@ Steps:
 **Script:** `ads_import_netlist.py`
 
 Steps:
-1. Load `<circuit_name>_prep.net` and PDK config `pdk-configs/<PDK_NAME>.yaml`
+1. Load `<circuit_name>_prep.net` and PDK config (core file) `pdk-configs/<PDK_NAME>_core.yaml`
 2. Translate component syntax to ADS netlist format per `ads-netlist-format.md`
    - For each `@PDK_SWAP` component: look up `ads_lib`, `ads_cell`, `pin_names`,
      and `port_mapping` from the PDK config `component_map`

@@ -1,0 +1,59 @@
+# WIN_PP1029_reference.yaml
+# PDK reference for WIN Semi PP1029 GaAs pHEMT process (lookup table)
+#
+# Usage: Load this file ON DEMAND ONLY — when a cell lookup is required
+#   during Stage 1 component mapping (e.g., to verify an unknown cell name
+#   or check for alternate variants).
+#   This file is NOT loaded on every session start.
+#
+# Source: ads_query_pdk_cells.py output — Run 1 (2026-04-06)
+
+# ── Known cells (full list from ads_query_pdk_cells.py, Run 1) ───────────────
+# 72 cells total in WIN_PP1029_DESIGN_KIT library.
+# This section lists all cells with symbol views (schematic-placeable).
+# See WIN_PP1029_core.yaml component_map for the recommended mappings.
+
+known_cells_with_symbol:
+  - PP1029_BVIA
+  - PP1029_bv2t
+  - PP1029_GND
+  - PP1029_mcfil
+  - PP1029_mclin
+  - PP1029_mcorn
+  - PP1029_mcross
+  - PP1029_mcurve
+  - PP1029_mlang
+  - PP1029_mlcrnr2
+  - PP1029_mlin
+  - PP1029_msabnd
+  - PP1029_mstep
+  - PP1029_mtaper
+  - PP1029_mtee
+  - PP1029_TFR
+  - PP1029_TFR_Slim
+  - PP1029_VIA_M1_M2
+  - PP1029_ProcVar
+  - PP1029_IND_ROUND_EM
+  - PP1029_SSIND
+  - WIN_PP1029_MS
+  - WIN_PP1029_CPW              # primary switch FET — see component_map in core.yaml
+  - WIN_PP1029_MS_HF
+  - WIN_PP1029_CPW_HF
+  - WIN_PP1029_CPW_J0072
+  - WIN_PP1029_CPW_N0122
+  - WIN_PP1029_CPW_N0132
+  - WIN_PP1029_SD
+  - WIN_PP1029_FGD
+  - WIN_PP1029_PND
+  - PP1029_MSR
+  - PP1029_MIM_CAP
+  - PP1029_MIM_CAP_Custom
+  - PP1029_COV
+  - PP1029_BRIDGE
+  - WIN_PP1029_DSW_S
+  - PP1029_MCRSOVER
+  - PP1029_PAD
+  - PP1029_PAD_RF
+  - PP1029_HOTVIA
+  - PP1029_SOIND
+  - PP1029_Bump
