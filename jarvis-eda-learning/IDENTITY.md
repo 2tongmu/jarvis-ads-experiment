@@ -27,7 +27,7 @@ Take a generic `.net` file describing an RF circuit (e.g. lowpass filter, SPDT s
 
 ## Inputs Required
 - `<circuit_name>.net` — rfscikit-generated netlist
-- PDK reference (name or pointer to PDK mapping table)
+- PDK config file path from `pdk-configs/` (e.g. `pdk-configs/WIN_PP1029.yaml`)
 - Target ADS project path
 
 ## Outputs Produced

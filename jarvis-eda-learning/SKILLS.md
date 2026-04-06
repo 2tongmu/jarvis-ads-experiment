@@ -65,23 +65,18 @@ cd workspace-scripts
 
 ---
 
-## Known Working PDK References
+## PDK Config Files
 
-| PDK | Library Name (API) | FET Cell | FET View | Pin Order |
-|---|---|---|---|---|
-| WIN_PP1029_DESIGN_KIT | `WIN_PP1029_DESIGN_KIT` | `WIN_PP1029_CPW` | `symbol` | pin1=gate, pin2=drain, pin3=source |
-| WIN_PP1029_DESIGN_KIT | `WIN_PP1029_DESIGN_KIT` | `WIN_PP1029_MS` | `symbol` | source pre-grounded — NOT for switch circuits |
+PDK-specific knowledge (cell names, pin offsets, component mappings, workspace setup rules)
+lives in `pdk-configs/`, NOT in agent memory or hardcoded in scripts.
 
-### WIN_PP1029_CPW Pin Offsets (verified 2026-04-06)
-Relative to instance origin (0,0):
+| Config File | PDK | Status |
+|---|---|---|
+| `pdk-configs/WIN_PP1029.yaml` | WIN Semi PP1029 GaAs pHEMT | ✅ validated Run 1 (2026-04-06) |
 
-| Angle | Pin 1 (gate) | Pin 2 (drain) | Pin 3 (source) |
-|---|---|---|---|
-| 0°  | (0.0, 0.0)  | (+0.5, +0.5) | (+0.5, -0.5) |
-| 90° | (0.0, 0.0)  | (-0.5, +0.5) | (+0.5, +0.5) |
+**At invocation, the orchestrator must provide the PDK config file path.**
+The agent loads this file at Stage 1 and reads all cell names, pin offsets, and
+placement recipes from it through Stages 1–3.
 
-**Series FET placement** (signal at y=0): place at `(x_drain + 0.5, -0.5)`, angle=90
-→ drain=(x_drain, 0), source=(x_drain+1, 0), gate=(x_drain+0.5, -0.5)
-
-**Shunt FET placement** (drain taps signal at node_x, y=0): place at `(node_x - 0.5, -0.5)`, angle=0
-→ drain=(node_x, 0), source=(node_x, -1.0), gate=(node_x-0.5, -0.5)
+To add a new PDK: create a new `.yaml` in `pdk-configs/` following the WIN_PP1029.yaml
+schema. Do not put PDK knowledge in MEMORY.md, SKILLS.md, or builder scripts.

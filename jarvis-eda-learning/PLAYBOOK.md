@@ -33,18 +33,21 @@ Steps:
 **Script:** `ads_import_netlist.py`
 
 Steps:
-1. Load `<circuit_name>_prep.net`
+1. Load `<circuit_name>_prep.net` and PDK config `pdk-configs/<PDK_NAME>.yaml`
 2. Translate component syntax to ADS netlist format per `ads-netlist-format.md`
-   - Replace `@PDK_SWAP` annotated components with PDK cell references
-   - Map port numbering to ADS port conventions
-   - Validate pin-count consistency for each substituted component
+   - For each `@PDK_SWAP` component: look up `ads_lib`, `ads_cell`, `pin_names`,
+     and `port_mapping` from the PDK config `component_map`
+   - For each `@KEEP` component: pass through as-is using `ads_rflib` ideal elements
+   - Map port numbering to ADS port conventions using config `port_mapping`
+   - Validate pin-count consistency: compare `pin_count` in config vs. component pins
 3. Output: `<circuit_name>_ads_import.net`
 4. Run a pre-import syntax check — confirm ADS can parse the file before Stage 3
 
 **Decision Rules:**
 - Pin-count mismatch after PDK swap → halt stage, log to MEMORY.md, escalate
-- Port mapping ambiguity → use default ADS port ordering, log assumption to MEMORY.md
+- Port mapping ambiguity → use default ADS port ordering from config, log assumption to MEMORY.md
 - Syntax check failure → do not proceed to Stage 3
+- Component type in `@PDK_SWAP` block not found in config `component_map` → halt, escalate
 
 ---
 
@@ -129,6 +132,28 @@ outputs:
   - spdt_switch_prep.net
   - spdt_switch_ads_import.net
   - spdt_switch_placeplan.yaml
+  - spdt_switch_ads_buildplan.yaml
+next_action: Open ADS project and verify schematic manually per Phase 1 checklist.
+errors: none
+```
+
+```yaml
+# Paused mid-run
+status: paused
+stage_completed: 2
+outputs:
+  - spdt_switch_prep.net
+  - spdt_switch_ads_import.net
+next_action: Resume from Stage 3 — run ads_placeplan_generate.py with existing _ads_import.net.
+errors: ADS API timeout during schematic build — see MEMORY.md Section 5 for full state.
+```
+
+**Rules:**
+- Never include file contents in the yield
+- Never include script stdout in the yield
+- Never include stack traces in the yield — those go to MEMORY.md only
+- If nothing was produced, yield `outputs: []`
+l
   - spdt_switch_ads_buildplan.yaml
 next_action: Open ADS project and verify schematic manually per Phase 1 checklist.
 errors: none

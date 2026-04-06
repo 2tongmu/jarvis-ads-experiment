@@ -47,12 +47,28 @@ On hard limit pause, save to MEMORY.md:
 
 ---
 
+## PDK Config Requirement
+
+A PDK config file path (`pdk-configs/<PDK_NAME>.yaml`) is **mandatory** before any pipeline work begins.
+
+| Condition | Action |
+|---|---|
+| PDK config path provided and file exists | Proceed with Stage 1 |
+| PDK config path provided but file not found | Halt at Stage 1 — report exact path that was checked, request correction |
+| No PDK config path provided at invocation | Halt at Stage 1 — do not infer, guess, or use hardcoded PDK knowledge. Report: "PDK config file required. Provide path to pdk-configs/<PDK_NAME>.yaml before proceeding." |
+| Config file missing required sections (`component_map`, `pin_offsets`, `workspace_setup`) | Halt at Stage 1 — list the missing sections, request a corrected config |
+
+**The agent must not substitute hardcoded PDK knowledge (e.g. from MEMORY.md or prior runs)
+for a missing config file. Each run must load its PDK from the config.**
+
+---
+
 ## Irreversible Action Rules
 These actions require explicit confirmation before execution — never assume permission:
 
 - Overwriting an existing ADS schematic in the target project
 - Deleting or replacing any `.net` or `.yaml` artifact that already exists
-- Modifying the PDK mapping table
+- Modifying any file in `pdk-configs/`
 
 If any of the above are required, stop and ask before proceeding.
 
