@@ -89,3 +89,50 @@ Steps:
 - `ads-schematic-checker` passes (zero errors, warnings logged if any)
 - Status report delivered to orchestrator
 - MEMORY.md updated with outcome summary
+
+---
+
+## Yield Format
+
+On task completion OR pause, yield ONLY the following fixed-format block to the orchestrator. Do not yield raw file contents, script output, or full MEMORY.md. Keep each field to one line maximum.
+
+```yaml
+status: success | partial | paused | failed
+stage_completed: 1 | 2 | 3 | none
+outputs:
+  - <filename> for each artifact produced (filenames only, no paths)
+next_action: <one sentence — what the orchestrator should do next>
+errors: none | <single-line brief description>
+```
+
+Examples:
+
+```yaml
+# Successful full run
+status: success
+stage_completed: 3
+outputs:
+  - spdt_switch_prep.net
+  - spdt_switch_ads_import.net
+  - spdt_switch_placeplan.yaml
+  - spdt_switch_ads_buildplan.yaml
+next_action: Open ADS project and verify schematic manually per Phase 1 checklist.
+errors: none
+```
+
+```yaml
+# Paused mid-run
+status: paused
+stage_completed: 2
+outputs:
+  - spdt_switch_prep.net
+  - spdt_switch_ads_import.net
+next_action: Resume from Stage 3 — run ads_placeplan_generate.py with existing _ads_import.net.
+errors: ADS API timeout during schematic build — see MEMORY.md Section 5 for full state.
+```
+
+**Rules:**
+- Never include file contents in the yield
+- Never include script stdout in the yield
+- Never include stack traces in the yield — those go to MEMORY.md only
+- If nothing was produced, yield `outputs: []`

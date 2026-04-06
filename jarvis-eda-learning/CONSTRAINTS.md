@@ -83,8 +83,48 @@ timestamp: ""
 
 ---
 
+## Script Output Limit
+
+Verbose script stdout silently bloats the session context and can cause the orchestrator to stall. Apply these rules to every script invocation:
+
+| Threshold | Action |
+|---|---|
+| stdout ≤ 50 lines | Pass through normally |
+| stdout > 50 lines | Truncate to 50 lines, save full output to `<script_name>_<timestamp>.log`, report path only |
+
+When truncating, always keep:
+- First 10 lines (startup / config confirmation)
+- Last 10 lines (result / exit status)
+- Middle lines replaced with: `[... N lines truncated — see log file ...]`
+
+Never pass raw stack traces to the orchestrator. Save full trace to log file and yield only:
+`errors: <ExceptionType> at <script>:<line> — see <logfile> for full trace`
+
+---
+
+## Session Recovery
+
+If the user types `reset` or `abort` at any point during a run:
+1. Immediately stop the current stage — do not finish the current step
+2. Write current state to MEMORY.md Section 5 (Pause State) with `pause_reason: user_reset`
+3. Yield the following to the orchestrator:
+
+```yaml
+status: paused
+stage_completed: <last fully completed stage>
+outputs: [<any artifacts successfully written before reset>]
+next_action: Awaiting user instruction to resume or restart.
+errors: none
+```
+
+4. Halt — do not continue until the user gives a new instruction
+
+---
+
 ## What Cannot Be Overridden
 - Hard token, time, and cost limits
 - Irreversible action confirmation requirement
 - Mandatory MEMORY.md update on pause
 - Telegram notification on unhandled exception
+- Script stdout 50-line cap
+- Structured yield format (defined in PLAYBOOK.md)
