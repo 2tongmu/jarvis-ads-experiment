@@ -1,0 +1,27 @@
+# gaas_phemt.yaml
+# Typical physical constants for GaAs pHEMT process
+# Generic best-estimate values — NOT PDK-specific
+# Source: published GaAs pHEMT literature (Golio, Pozar, vendor app notes)
+# Override in pdk-configs/<PDK>_core.yaml if measured values are available
+
+process_type: gaas_phemt
+
+# Gate capacitance densities (typical range across foundries)
+# GaAs pHEMT: Cgs ~ 0.6-0.9 fF/um, Cgd ~ 0.1-0.2 fF/um
+cgs_um: 0.75    # fF/um  best estimate — confirm from PDK or measurement
+cgd_um: 0.15    # fF/um  best estimate — ~20% of Cgs, typical
+cstray: 10.0    # fF     via + gate metal stray — layout dependent
+
+# Stability constraint (process-level, not layout-dependent)
+rs_stability_floor: 1000  # Ohm  Cgd feedback / negative-Gm floor
+                           # conservative for GaAs pHEMT
+                           # tighten only if PDK characterisation data available
+
+# Notes
+notes: >
+  cgs_um and cgd_um are literature estimates for generic GaAs pHEMT.
+  Actual values depend on gate length, epitaxial stack, and bias point.
+  Fine-tune after running Cgs extraction in ADS or from PDK model card.
+  cstray is layout-dependent — 10 fF is typical for CPW probe pad + via.
+  For a different process type (GaN, SiGe), create a new file in this
+  folder and reference it from the bias rules file.
