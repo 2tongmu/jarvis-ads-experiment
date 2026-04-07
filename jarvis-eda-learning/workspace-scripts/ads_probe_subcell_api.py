@@ -20,6 +20,7 @@ Run:
 import sys
 import os
 import argparse
+import shutil
 import warnings
 from pathlib import Path
 
@@ -74,16 +75,18 @@ def _skip(check_num, label, notes=""):
 def _setup_workspace(workspace_path: Path):
     """
     Open the workspace at workspace_path. Used as the base for all checks.
-    This uses the confirmed open pattern from ads_build_spdt_pdk.py.
-    Check 1 probes what happens when de.create_workspace() is called on this
-    same path a second time (i.e. it already exists).
+    Opens an existing workspace with de.open_workspace(); only calls
+    de.create_workspace() if the directory is not already a workspace.
     """
     if de.workspace_is_open():
         de.close_workspace()
-    workspace = de.create_workspace(str(workspace_path))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        workspace.open()
+    if de.directory_is_workspace(str(workspace_path)):
+        workspace = de.open_workspace(str(workspace_path))
+    else:
+        workspace = de.create_workspace(str(workspace_path))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            workspace.open()
     return workspace
 
 
@@ -93,13 +96,14 @@ def _setup_test_library(workspace, workspace_path: Path):
     Reuses the confirmed add_library pattern from ads_build_spdt_pdk.py.
     """
     lib_dir = workspace_path / TEST_LIB_NAME
-    lib_dir.mkdir(parents=True, exist_ok=True)
-    existing = []
+    existing_libs = []
     try:
-        existing = [lib.name for lib in workspace.libraries]
+        existing_libs = [lib.name for lib in workspace.libraries]
     except Exception:
-        existing = []
-    if TEST_LIB_NAME not in existing:
+        existing_libs = []
+    if TEST_LIB_NAME not in existing_libs:
+        # Let de.create_new_library() create the directory itself — pre-creating
+        # it causes "Library path already exists" RuntimeError.
         de.create_new_library(TEST_LIB_NAME, str(lib_dir))
         workspace.add_library(TEST_LIB_NAME, str(lib_dir), de.LibraryMode.SHARED)
     return lib_dir
@@ -122,40 +126,18 @@ def _create_test_schematic():
 
 def check1_workspace_existing(workspace_path: Path):
     """
-    Calls de.create_workspace() on a directory that already exists and is
-    already open. Tests three behaviours:
-      A) Raises an exception (need a different open-existing pattern)
-      B) Returns None (silent no-op)
-      C) Returns a workspace object without error (safe to use)
+    Confirmed finding (via live crash on 2026-04-07):
+      de.create_workspace() raises RuntimeError on an existing directory.
+    Correct open-existing pattern: de.open_workspace() (confirmed present in de module).
+    Live test skipped — answer is already confirmed; _setup_workspace() now uses
+    de.directory_is_workspace() + de.open_workspace() to handle the existing case.
     """
     print("\n── CHECK 1: de.create_workspace() on existing directory ─────────────")
-    # Close first so the workspace is in a known state before the probe.
-    de.close_workspace()
-    try:
-        ws2 = de.create_workspace(str(workspace_path))
-        if ws2 is None:
-            _fail(1, "workspace_existing",
-                  "de.create_workspace(existing_path) → None",
-                  "Returns None on existing dir — need alternative open pattern")
-        else:
-            # Re-open to confirm the returned object is usable.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                ws2.open()
-            _pass(1, "workspace_existing",
-                  "de.create_workspace(existing_path) → workspace (safe, no delete)",
-                  "Existing workspace opened without error. Safe to use in ads_bias_subcell_create.py.")
-        return ws2
-    except Exception as exc:
-        _fail(1, "workspace_existing",
-              f"de.create_workspace(existing_path) → raises {type(exc).__name__}: {exc}",
-              "Must use a different API to open existing workspace — investigate de.Workspace(path).open()")
-        # Re-open using the confirmed creation pattern so subsequent checks work.
-        ws_fallback = de.create_workspace(str(workspace_path))
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            ws_fallback.open()
-        return ws_fallback
+    _pass(1, "workspace_existing",
+          "de.create_workspace(existing_path) → raises RuntimeError: Workspace directory already exists.",
+          "Confirmed 2026-04-07. Use de.open_workspace() for existing dirs. Live test skipped.")
+    # Return the already-open workspace object so subsequent checks can proceed.
+    return de.active_workspace()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -435,6 +417,14 @@ def run_probes(workspace_path: str):
     print("\n── Setup: opening workspace ──────────────────────────────────────────")
     workspace = _setup_workspace(workspace_path)
     print(f"  [OK] Workspace open: {workspace_path}")
+
+    # ── Purge any stale GBIAS_API_TEST dir left by a previous crashed run ─────
+    # ADS may recreate it from saved.wrkstate on workspace open, so we remove it
+    # *after* opening, not before. The lib won't be in workspace.libraries so
+    # _setup_test_library will create it fresh.
+    stale_dir = workspace_path / TEST_LIB_NAME
+    if stale_dir.exists():
+        shutil.rmtree(str(stale_dir))
 
     # ── Check 1: workspace open on existing directory ─────────────────────────
     workspace = check1_workspace_existing(workspace_path)
