@@ -154,15 +154,14 @@ def _build_switch_gate_subcell(workspace, lib_name: str):
     # These become the subcell's parameterised interface — parent schematic
     # sets Rs/Cp/Vctrl per FET instance, overriding these defaults.
     #
-    # ⚠ UNVERIFIED: sch.add_variable() is inferred from ADS Python API
-    #   conventions. Alternatives if this fails:
-    #     sch.cell.add_variable(name, default)
-    #     sch.design_variables[name] = default
-    #   Update MEMORY.md with the confirmed method after first run.
-    sch.add_variable("Rs",    "300 Ohm")   # gate bias isolation resistor
-    sch.add_variable("Cp",    "0.012 pF")  # RF bypass (12 fF = 0.012 pF)
-    sch.add_variable("Vctrl", "0.0 V")     # DC gate control voltage
-    print(f"[BUILD] Cell variables defined: Rs=300 Ohm, Cp=0.012 pF, Vctrl=0.0 V")
+    # CONFIRMED 2026-04-07: write_design_variables() accepts a dict
+    # read back with sch.cell.read_design_variables()
+    sch.cell.write_design_variables({
+        "Rs":    "300 Ohm",
+        "Cp":    "2.387 pF",
+        "Vctrl": "-0.5 V"
+    })
+    print(f"[BUILD] Cell variables defined: Rs=300 Ohm, Cp=2.387 pF, Vctrl=-0.5 V")
 
     # ── Shared helpers (local scope, same pattern as ads_build_spdt_pdk.py) ───
 
@@ -190,23 +189,18 @@ def _build_switch_gate_subcell(workspace, lib_name: str):
         # pts: list of (x,y) tuples; endpoints must exactly match pin snap_points
         sch.add_wire(pts)
 
-    # ── PORT_CTRL pin (x=0, y=0) — external ctrl_node access ────────────────
-    # Port pins define the subcell's external interface for a subcircuit.
+    # ── PORT_CTRL port (x=0, y=0) — external ctrl_node access ────────────────
+    # Port symbols define the subcell's external interface for a subcircuit.
     # In the parent schematic, PORT_CTRL connects to the optional external
     # control driver. If unused, it floats (Vctrl_src drives ctrl_node instead).
     #
-    # ⚠ UNVERIFIED: Port/Pin symbol library and cell name for subcircuit ports.
-    #   In ADS GUI, subcircuit pins are placed from system_sch:Pin:symbol.
-    #   The "Name" parameter sets the port name visible to the parent schematic.
-    #   If this fails, try:
-    #     de.LCVName("ads_port", "Pin", "symbol")
-    #     de.LCVName("ads_simulation", "Term", "symbol")  (but Term adds S-param port)
-    #   Update MEMORY.md with the confirmed library/cell after first run.
-    pin_ctrl = sch.add_instance(de.LCVName("system_sch", "Pin", "symbol"),
-                                (0.0, 0.0), name="PORT_CTRL", angle=180.0)
-    # ⚠ UNVERIFIED: Pin parameter name for the port label.
-    #   Likely "Name" or "PinName" — check via dir(pin_ctrl.parameters) on first run.
-    pin_ctrl.parameters["Name"].value = "CTRL"
+    # CONFIRMED 2026-04-07: schematic port symbol is Term in ads_simulation
+    # TermG is grounded variant — use for GND ports if needed
+    port_ctrl = sch.add_instance(de.LCVName("ads_simulation", "Term", "symbol"),
+                                 (0.0, 0.0), name="PORT_CTRL", angle=180.0)
+    # CONFIRMED 2026-04-07: Term uses Num for port number, Z for impedance
+    # Z defaults to 50 Ohm — set explicitly for bias ports
+    port_ctrl.parameters["Num"].value = "1"
     print(f"[BUILD] PORT_CTRL placed at (0.0, 0.0)")
 
     # ── Vctrl_src: V_DC source (ctrl_node to GND) ────────────────────────────
@@ -215,16 +209,12 @@ def _build_switch_gate_subcell(workspace, lib_name: str):
     # − terminal (P2) connects to GND below.
     # Component placed at (1.5, -0.5), vertical orientation.
     #
-    # ⚠ UNVERIFIED: V_DC library and cell name in ADS Python API.
-    #   Best guess: ads_simulation:V_DC:symbol  (matches ADS GUI component palette)
-    #   Pin positions at angle=0 (vertical): guessed P1=(1.5,0.0) [+], P2=(1.5,-1.0) [-]
-    #   Confirm pin offsets via ads_probe_fet_pins.py pattern if placement fails.
-    #   Alternative library: ads_rflib or ads_sources
-    vctrl_src = sch.add_instance(de.LCVName("ads_simulation", "V_DC", "symbol"),
+    # CONFIRMED 2026-04-07: ads_sources library, V_DC cell, Vdc parameter key
+    # Pin positions at angle=0 (vertical): P1=(1.5, 0.0) [+/ctrl_node], P2=(1.5, -1.0) [-/GND]
+    vctrl_src = sch.add_instance(de.LCVName("ads_sources", "V_DC", "symbol"),
                                  (1.5, -0.5), name="Vctrl_src", angle=0.0)
-    # Vdc parameter references the cell-level variable Vctrl defined above.
-    # ADS resolves bare variable names in parameter fields at simulation time.
-    # ⚠ UNVERIFIED: parameter name may be "Vdc" or "V" depending on ADS version.
+    # CONFIRMED 2026-04-07: ads_sources, Vdc parameter key
+    # Vdc references the cell-level variable Vctrl — ADS resolves at simulation time.
     vctrl_src.parameters["Vdc"].value = "Vctrl"
     mkGnd("GND_vctrl", 1.5, -1.5)
     print(f"[BUILD] Vctrl_src (V_DC) placed at (1.5, -0.5), Vdc=Vctrl")
@@ -244,13 +234,16 @@ def _build_switch_gate_subcell(workspace, lib_name: str):
     mkR("Rs_bias", 5.0, 0.0, "Rs")
     print(f"[BUILD] Rs_bias (R horizontal) placed at (5.0, 0.0), R=Rs")
 
-    # ── PORT_GATE pin (x=6.5, y=0) — connects to FET gate in parent ──────────
-    # This is the primary interface pin. In the parent schematic, the gate pin
+    # ── PORT_GATE port (x=6.5, y=0) — connects to FET gate in parent ─────────
+    # This is the primary interface port. In the parent schematic, the gate pin
     # of each PDK FET (WIN_PP1029_CPW pin1) connects here.
-    # ⚠ UNVERIFIED: same Pin symbol uncertainty as PORT_CTRL above.
-    pin_gate = sch.add_instance(de.LCVName("system_sch", "Pin", "symbol"),
-                                (6.5, 0.0), name="PORT_GATE", angle=0.0)
-    pin_gate.parameters["Name"].value = "GATE"
+    # CONFIRMED 2026-04-07: schematic port symbol is Term in ads_simulation
+    # TermG is grounded variant — use for GND ports if needed
+    port_gate = sch.add_instance(de.LCVName("ads_simulation", "Term", "symbol"),
+                                 (6.5, 0.0), name="PORT_GATE", angle=0.0)
+    # CONFIRMED 2026-04-07: Term uses Num for port number, Z for impedance
+    # Z defaults to 50 Ohm — set explicitly for bias ports
+    port_gate.parameters["Num"].value = "2"
     print(f"[BUILD] PORT_GATE placed at (6.5, 0.0)")
 
     # ── Wires ─────────────────────────────────────────────────────────────────
