@@ -72,32 +72,42 @@ except ImportError:
 # The fallback computes Rs from the known prep.net value and Cp from the
 # bypass impedance criterion: |Xcp| = Rs/10 at f_low.
 
-BiasResult = namedtuple("BiasResult", ["rs_bias", "cp_bypass"])
-# rs_bias:  Ohm (float)
-# cp_bypass: pF (float)
-
 try:
-    from gate_bias_network import calculate_bias
+    from gate_bias_network import FETParams, BiasSpecs, BiasComponents, calculate_bias
     _BIAS_CALC_SOURCE = "gate_bias_network module"
 except ImportError:
-    def calculate_bias(ugw, nof, process_params, specs):
-        """
-        Fallback bias calculator — used when gate_bias_network.py does not exist.
+    # Minimal fallback dataclasses — used when gate_bias_network.py is absent.
+    from dataclasses import dataclass, field as _field
+    from typing import Optional as _Optional
 
-        Rs = 300 Ohm: taken directly from spdt_switch_prep.net GBIAS blocks.
-          This value is process-validated for WIN_PP1029 at 2-18 GHz.
+    @dataclass
+    class FETParams:
+        ugw: float; nof: int; ugw_per_finger: float
+        cgs_um: float = 0.75; cgd_um: float = 0.15; cstray: float = 10.0
+        cgs: float = _field(init=False); cgd: float = _field(init=False)
+        cgs_total: float = _field(init=False)
+        def __post_init__(self):
+            self.cgs = self.ugw * self.cgs_um
+            self.cgd = self.ugw * self.cgd_um
+            self.cgs_total = self.cgs + self.cstray
 
-        Cp = 1 / (2π × f_low × Rs/10): bypass cap sized so |Xcp| = Rs/10 at f_low.
-          Provides >20 dB RF isolation through the bias network at lower band edge.
-          For f_low=2 GHz, Rs=300 Ohm → Cp = 2.653 pF.
+    @dataclass
+    class BiasSpecs:
+        f_low: float = 2.0; f_high: float = 18.0
+        t_sw: float = 1.0;  r_ctrl: float = 50.0
 
-        ugw and nof are accepted but not used in the fallback.
-        The gate_bias_network module uses them for device-geometry-dependent sizing.
-        """
-        rs_bias = 300.0
-        f_low_hz = float(specs.get("f_low", 2.0)) * 1e9
-        cp_bypass_pF = 1.0 / (2.0 * math.pi * f_low_hz * (rs_bias / 10.0)) * 1e12
-        return BiasResult(rs_bias=rs_bias, cp_bypass=cp_bypass_pF)
+    @dataclass
+    class BiasComponents:
+        rs_bias: float; cp_bypass: float   # cp_bypass in fF
+        rs_ok: bool = True; cp_ok: bool = True
+        t_sw_ok: bool = True; t_ctrl_ok: bool = True
+
+    def calculate_bias(fet: FETParams, specs: BiasSpecs) -> BiasComponents:
+        """Fallback: stability-floor Rs, minimum Cp (in fF), no geometry correction."""
+        rs_bias = 1000.0
+        cp_bypass_fF = (1.0 / (2.0 * math.pi * specs.f_low * 1e9 * (rs_bias / 10.0))) * 1e15
+        return BiasComponents(rs_bias=rs_bias, cp_bypass=cp_bypass_fF)
+
     _BIAS_CALC_SOURCE = "fallback (gate_bias_network.py not found)"
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
@@ -299,16 +309,17 @@ def _remove_stub(sch, stub_name: str, dry_run: bool) -> bool:
       Update MEMORY.md with confirmed method after first run.
     """
     gnd_name = f"GND_{stub_name}"
+
+    if dry_run:
+        print(f"  [DRY ] Would delete: {stub_name}, {gnd_name}")
+        return True
+
     stub = _find_instance(sch, stub_name)
     gnd  = _find_instance(sch, gnd_name)
 
     if stub is None:
         print(f"  [SKIP] {stub_name} not found — already removed or never placed")
         return False
-
-    if dry_run:
-        print(f"  [DRY ] Would delete: {stub_name}, {gnd_name}")
-        return True
 
     # ⚠ UNVERIFIED: sch.delete_instance() — see docstring above
     try:
@@ -367,14 +378,26 @@ def _insert_one_bias(sch, fet: dict, bias_rules: dict, process_defaults: dict,
     stub_name = fet["stub_name"]
 
     # ── Step 1: Compute bias values ───────────────────────────────────────────
-    comp = calculate_bias(
-        ugw=fet["ugw"],
-        nof=fet["nof"],
-        process_params=process_defaults,
-        specs=specs,
+    # Build typed objects from FET table entry + loaded YAML dicts.
+    # ugw in FET_TABLE is per-finger (unit gate width); total = ugw × nof.
+    ugw_total = fet["ugw"] * fet["nof"]
+    fet_params = FETParams(
+        ugw            = ugw_total,
+        nof            = fet["nof"],
+        ugw_per_finger = float(fet["ugw"]),
+        cgs_um         = float(process_defaults.get("cgs_um",  0.75)),
+        cgd_um         = float(process_defaults.get("cgd_um",  0.15)),
+        cstray         = float(process_defaults.get("cstray",  10.0)),
     )
+    bias_specs = BiasSpecs(
+        f_low  = float(specs.get("f_low",  2.0)),
+        f_high = float(specs.get("f_high", 18.0)),
+        t_sw   = float(specs.get("t_sw",   1.0)),
+        r_ctrl = float(specs.get("r_ctrl", 50.0)),
+    )
+    comp = calculate_bias(fet_params, bias_specs)
     rs_val    = round(comp.rs_bias / 10) * 10              # round to nearest 10 Ohm
-    cp_val    = round(comp.cp_bypass, 4)                   # 4 decimal places in pF
+    cp_val    = round(comp.cp_bypass / 1000.0, 4)          # fF → pF, 4 decimal places
     vctrl_val = _get_vctrl(bias_rules, role)
 
     print(f"\n  [{name}] role={role}  Rs={rs_val} Ohm  Cp={cp_val} pF  Vctrl={vctrl_val}")

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python workspace-scripts/test_bias_inserter.py)"
+    ]
+  }
+}

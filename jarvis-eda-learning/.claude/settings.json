@@ -1,0 +1,11 @@
+{
+  "allowedPaths": [
+    "C:\\Github_folders\\jarvis-ads-experiment"
+  ],
+  "denyPaths": [
+    "C:\\Users",
+    "C:\\Windows",
+    "C:\\Program Files",
+    "C:\\Program Files (x86)"
+  ]
+}
