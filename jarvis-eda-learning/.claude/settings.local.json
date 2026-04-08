@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python workspace-scripts/test_bias_inserter.py)"
+      "Bash(python workspace-scripts/test_bias_inserter.py)",
+      "Bash(python -m pytest workspace-scripts/test_bias_inserter.py -v)",
+      "Bash(\"/mnt/c/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
+      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
+      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
+      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pip install pytest)"
     ]
   }
 }
