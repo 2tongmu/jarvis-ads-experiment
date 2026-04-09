@@ -219,7 +219,7 @@ def main(net_path: Path):
     for comp in shunts:
         sx, _ = _shunt_xy(comp, series)
         design.add_wire([(sx, 0.0), (sx, -1.0)])
-        print(f"  shunt wire: ({sx}, 0.0) → ({sx}, -1.0)")
+        print(f"  shunt wire: ({sx}, 0.0) -> ({sx}, -1.0)")
 
     # ── Design variables from .param ───────────────────────────────────────────
     if params:
