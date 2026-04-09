@@ -15,8 +15,13 @@ Usage (Jarvis):
 Cell placed in: spdt_switch_pdk_lib
 Cell name: cell_<netlist_stem>  (e.g. test_bias_rc → cell_test_bias_rc)
 
-API: keysight.ads.de object API only — no AEL de_* calls.
-     Confirmed by Jarvis execution 2026-04-08. See ADS_API_REFERENCE.md.
+Placement: coordinates and angles match .dem recording and ads_build_spdt_pdk.py
+  Angles — C (shunt): -90.0   GND: -90.0   R (series): 0.0  (from ads_build_spdt_pdk.py)
+  RC bias coordinates — from .dem ground truth:
+    v_ctrl pin: (1.375, 0)   C1: (2.875, 0)   R1: (4.25, 0)   sw_gate pin: (5.25, 0)
+    GND: (2.875, -1)
+    Main wire: (1.375,0)→(2.875,0)→(4.25,0)→(5.25,0)
+    Shunt wire: (2.875,0)→(2.875,-1)
 """
 
 import sys
@@ -38,23 +43,16 @@ from keysight.ads.de._pde.db import TermType, DesignMode
 # ── Constants ──────────────────────────────────────────────────────────────────
 WORKSPACE = "C:/Users/jarvis/ads_projects/spdt_switch_pdk_wrk"
 LIB       = "spdt_switch_pdk_lib"
+GND_NETS  = {'0', 'gnd', 'GND', 'GROUND', 'ground'}
 
-COMP_LCV = {
-    'R': de.LCVName('ads_rflib', 'R', 'symbol'),
-    'C': de.LCVName('ads_rflib', 'C', 'symbol'),
-    'L': de.LCVName('ads_rflib', 'L', 'symbol'),
-}
-GND_LCV  = de.LCVName('ads_rflib', 'GROUND', 'symbol')
-GND_NETS = {'0', 'gnd', 'GND', 'GROUND', 'ground'}
-
-# Schematic grid (user units) — matches ads_rflib component sizes
-GRID_X     = 2.0   # horizontal spacing between series components
-GRID_Y     = 1.5   # vertical drop for shunt component center
-PIN_OFFSET = 0.5   # assumed pin-to-center half-width for ads_rflib R/C
+# Component angles — confirmed from ads_build_spdt_pdk.py mkR/mkC/mkGnd helpers
+ANGLE_R_SERIES = 0.0     # horizontal resistor
+ANGLE_C_SHUNT  = -90.0   # shunt capacitor (vertical, pin1 at top)
+ANGLE_GND      = -90.0   # ground symbol
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Step 2 — Parse .net
+# Step 2 — Parse .net  (unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def parse_net(path: Path):
@@ -101,74 +99,7 @@ def parse_net(path: Path):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Placement helpers
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _order_series(series, start_net):
-    """
-    Walk series components from start_net in topological order.
-    Returns (ordered_list, entry_nodes_list).
-    """
-    ordered, entry_nodes, remaining = [], [], list(series)
-    current = start_net
-    while remaining:
-        for c in remaining:
-            if current in c['nodes']:
-                ordered.append(c)
-                entry_nodes.append(current)
-                remaining.remove(c)
-                current = next(n for n in c['nodes'] if n != current)
-                break
-        else:
-            ordered.extend(remaining)
-            entry_nodes.extend([remaining[0]['nodes'][0]] * len(remaining))
-            break
-    return ordered, entry_nodes
-
-
-def compute_placement(components, ports):
-    """
-    Simple left-to-right placement for single-path topologies.
-      Series: placed horizontally at y=0, x = GRID_X, 2*GRID_X, ...
-      Shunt:  placed vertically below their junction node.
-
-    Returns:
-        placement   : {name: {x, y, angle}}
-        gnd_markers : {gnd_name: {x, y, angle}}
-        ordered     : series components in traversal order
-        entry_nodes : which node was entry for each ordered component
-        final_x     : x after last series component (used for right port pin)
-    """
-    port1_net = next(
-        (p['net'] for p in sorted(ports, key=lambda p: p['number'])), None
-    )
-    shunts  = [c for c in components if any(n in GND_NETS for n in c['nodes'])]
-    series  = [c for c in components if c not in shunts]
-    ordered, entry_nodes = _order_series(series, port1_net)
-
-    placement, gnd_markers = {}, {}
-
-    x = GRID_X
-    for comp in ordered:
-        placement[comp['name']] = {'x': x, 'y': 0.0, 'angle': 0.0}
-        x += GRID_X
-
-    for comp in shunts:
-        non_gnd = next(n for n in comp['nodes'] if n not in GND_NETS)
-        ref_x   = x - GRID_X  # fallback
-        for sc, en in zip(ordered, entry_nodes):
-            if non_gnd in sc['nodes']:
-                exit_n = next(n for n in sc['nodes'] if n != en)
-                ref_x  = placement[sc['name']]['x'] + (PIN_OFFSET if non_gnd == exit_n else -PIN_OFFSET)
-                break
-        placement[comp['name']]            = {'x': ref_x, 'y': -(GRID_Y / 2), 'angle': 90.0}
-        gnd_markers[f'GND_{comp["name"]}'] = {'x': ref_x, 'y': -(GRID_Y + 0.5), 'angle': 180.0}
-
-    return placement, gnd_markers, ordered, entry_nodes, x
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Main
+# Step 4 — Create ADS cell
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main(net_path: Path):
@@ -185,6 +116,13 @@ def main(net_path: Path):
     sym_lcv   = f"{LIB}:{cell_name}:symbol"
     print(f"\n=== Target cell: {lcv} ===")
 
+    # ── Classify components ────────────────────────────────────────────────────
+    shunts = [c for c in components if any(n in GND_NETS for n in c['nodes'])]
+    series = [c for c in components if c not in shunts]
+    print(f"\n=== Topology ===")
+    print(f"  series : {[c['name'] for c in series]}")
+    print(f"  shunts : {[c['name'] for c in shunts]}")
+
     # ── Open workspace ─────────────────────────────────────────────────────────
     print("\n=== Opening workspace ===")
     with warnings.catch_warnings():
@@ -193,7 +131,8 @@ def main(net_path: Path):
     print(f"  {ws}")
 
     # ── Get library, create/recreate cell and schematic view ───────────────────
-    print("\n=== Setting up cell and schematic view ===")
+    # Pattern from ads_bias_subcell_create.py (Jarvis confirmed 2026-04-08)
+    print("\n=== Setting up cell ===")
     lib = de.get_open_library(LIB)
 
     if lib.cell_exists(cell_name):
@@ -207,101 +146,80 @@ def main(net_path: Path):
         cell.delete_view('schematic')
         print(f"  deleted existing schematic view")
     sch_view = de.View.create(cell, 'schematic', 'schematic')
-    print(f"  schematic view created: {lcv}")
+    print(f"  schematic view created")
 
-    # ── Get design in WRITE mode ───────────────────────────────────────────────
-    # CRITICAL: default is READ_ONLY — must use WRITE to persist changes
+    # CRITICAL: must use DesignMode.WRITE — READ_ONLY (default) cannot save
     design = sch_view.get_design(DesignMode.WRITE)
-    print(f"  design open (WRITE): {design}")
+    print(f"  design open (WRITE mode)")
 
-    # ── Compute placement ──────────────────────────────────────────────────────
-    shunts = [c for c in components if any(n in GND_NETS for n in c['nodes'])]
-    placement, gnd_markers, ordered, entry_nodes, final_x = compute_placement(
-        components, ports
-    )
-
-    # ── Create port nets and terms ─────────────────────────────────────────────
-    # Terms (sub-cell pins) must be created before instances/wires so that
-    # wires can reach their snap-points.
+    # ── Port terms ─────────────────────────────────────────────────────────────
+    # Create terms before instances so wire endpoints connect to them.
+    # Positions are implicit — wire endpoints (1.375,0) and (5.25,0) establish location.
     print("\n=== Creating port terms ===")
-    port_nets  = {}
     port_terms = {}
     for port in sorted(ports, key=lambda p: p['number']):
         net  = design.find_or_add_net(port['net'])
         term = design.add_term(net, port['net'], TermType.INPUT_OUTPUT)
-        port_nets[port['net']]  = net
         port_terms[port['net']] = term
         print(f"  port {port['number']}: '{port['net']}'")
 
-    # ── Place series instances ─────────────────────────────────────────────────
+    # ── Place instances ────────────────────────────────────────────────────────
+    # Coordinates: .dem ground truth (see module docstring)
+    # Angles: ads_build_spdt_pdk.py confirmed values
     print("\n=== Placing instances ===")
-    instances = {}
 
-    for comp in ordered:
-        p    = placement[comp['name']]
-        lcv_ = COMP_LCV.get(comp['type'], de.LCVName('ads_rflib', comp['type'], 'symbol'))
-        inst = design.add_instance(lcv_, (p['x'], p['y']),
-                                   name=comp['name'], angle=p['angle'])
-        instances[comp['name']] = inst
-        print(f"  {comp['name']} [series] @ ({p['x']:.2f}, {p['y']:.2f}) angle={p['angle']}")
-
+    # Shunt components: placed at signal wire (y=0), angle=-90 (confirmed)
     for comp in shunts:
-        p    = placement[comp['name']]
-        lcv_ = COMP_LCV.get(comp['type'], de.LCVName('ads_rflib', comp['type'], 'symbol'))
-        inst = design.add_instance(lcv_, (p['x'], p['y']),
-                                   name=comp['name'], angle=p['angle'])
-        instances[comp['name']] = inst
-        print(f"  {comp['name']} [shunt] @ ({p['x']:.2f}, {p['y']:.2f}) angle={p['angle']}")
+        non_gnd = next(n for n in comp['nodes'] if n not in GND_NETS)
+        angle   = ANGLE_C_SHUNT if comp['type'] == 'C' else -90.0
+        x, y    = _shunt_xy(comp, series)
+        inst    = design.add_instance(
+            de.LCVName('ads_rflib', comp['type'], 'symbol'),
+            (x, y), name=comp['name'], angle=angle,
+        )
+        inst.parameters[comp['type']].value = comp['value']
+        print(f"  {comp['name']} [shunt] @ ({x}, {y}) angle={angle}")
 
-    for gnd_name, p in gnd_markers.items():
-        design.add_instance(GND_LCV, (p['x'], p['y']),
-                            name=gnd_name, angle=p['angle'])
-        print(f"  {gnd_name} [GND] @ ({p['x']:.2f}, {p['y']:.2f})")
+        # GND symbol below shunt component (confirmed: angle=-90)
+        gnd_y = y - 1.0
+        design.add_instance(
+            de.LCVName('ads_rflib', 'GROUND', 'symbol'),
+            (x, gnd_y), name=f'GND_{comp["name"]}', angle=ANGLE_GND,
+        )
+        print(f"  GND_{comp['name']} @ ({x}, {gnd_y}) angle={ANGLE_GND}")
 
-    # ── Set component parameter values ─────────────────────────────────────────
-    print("\n=== Setting component parameters ===")
-    PARAM_KEY = {'R': 'R', 'C': 'C', 'L': 'L'}
-    for comp in components:
-        inst = instances.get(comp['name'])
-        key  = PARAM_KEY.get(comp['type'])
-        if not inst or not key:
-            continue
-        try:
-            inst.parameters[key].value = comp['value']
-            print(f"  {comp['name']}.{key} = '{comp['value']}'")
-        except Exception as e:
-            print(f"  [WARN] {comp['name']}.{key} set failed: {e}")
+    # Series components: placed on signal wire (y=0), angle=0 (confirmed)
+    for comp in series:
+        x, y = _series_xy(comp, shunts, series)
+        inst  = design.add_instance(
+            de.LCVName('ads_rflib', comp['type'], 'symbol'),
+            (x, y), name=comp['name'], angle=ANGLE_R_SERIES,
+        )
+        inst.parameters[comp['type']].value = comp['value']
+        print(f"  {comp['name']} [series] @ ({x}, {y}) angle={ANGLE_R_SERIES}")
 
-    # ── Add wires ──────────────────────────────────────────────────────────────
-    # Port pin positions: left port at x=0, right port at x=final_x
+    # ── Wires ──────────────────────────────────────────────────────────────────
+    # Coordinates: .dem ground truth
+    # Pattern: ads_build_spdt_pdk.py wire() helper → sch.add_wire(pts)
     print("\n=== Adding wires ===")
 
-    left_net  = entry_nodes[0]                                   if ordered else None
-    right_net = next(n for n in ordered[-1]['nodes'] if n != entry_nodes[-1]) if ordered else None
+    port_xs  = _port_xs(ports, series, shunts)
+    left_x   = port_xs['left']
+    right_x  = port_xs['right']
+    shunt_xs = [_shunt_xy(c, series)[0] for c in shunts]
 
-    port_x = {}
-    for port in ports:
-        if port['net'] == left_net:
-            port_x[port['net']] = 0.0
-        elif port['net'] == right_net:
-            port_x[port['net']] = final_x
-        else:
-            port_x[port['net']] = final_x + GRID_X
+    # Main horizontal wire — single polyline through all waypoints at y=0.
+    # Includes port endpoints, shunt component x positions, and series component x positions.
+    series_xs = [_series_xy(c, shunts, series)[0] for c in series]
+    waypoints  = sorted({left_x, right_x} | set(shunt_xs) | set(series_xs))
+    design.add_wire([(x, 0.0) for x in waypoints])
+    print(f"  main wire: {[(x, 0.0) for x in waypoints]}")
 
-    # Main horizontal wire at y=0: left port → right port
-    if ordered and left_net and right_net:
-        lx = port_x.get(left_net, 0.0)
-        rx = port_x.get(right_net, final_x)
-        design.add_wire([(lx, 0.0), (rx, 0.0)])
-        print(f"  main wire: ({lx:.2f}, 0.0) → ({rx:.2f}, 0.0)")
-
-    # Shunt wires: from main wire (y=0) down through component to GND
+    # Shunt vertical wires — from main wire down to GND symbol
     for comp in shunts:
-        p     = placement[comp['name']]
-        gnd_p = gnd_markers.get(f'GND_{comp["name"]}')
-        if gnd_p:
-            design.add_wire([(p['x'], 0.0), (p['x'], gnd_p['y'])])
-            print(f"  shunt wire: ({p['x']:.2f}, 0.0) → ({p['x']:.2f}, {gnd_p['y']:.2f})")
+        sx, _ = _shunt_xy(comp, series)
+        design.add_wire([(sx, 0.0), (sx, -1.0)])
+        print(f"  shunt wire: ({sx}, 0.0) → ({sx}, -1.0)")
 
     # ── Design variables from .param ───────────────────────────────────────────
     if params:
@@ -315,40 +233,68 @@ def main(net_path: Path):
     design.save_design()
     print(f"  saved: {lcv}")
 
-    # ── Create blackbox symbol ─────────────────────────────────────────────────
-    print("\n=== Creating blackbox symbol ===")
+    # ── Symbol ─────────────────────────────────────────────────────────────────
+    # Pattern: ads_bias_subcell_create.py (Jarvis confirmed 2026-04-08)
+    print("\n=== Creating symbol ===")
     try:
         if cell.view_exists('symbol'):
             cell.delete_view('symbol')
             print(f"  deleted existing symbol view")
 
-        symbol_design = db.create_symbol((LIB, cell_name, 'symbol'))
-        print(f"  symbol view created: {sym_lcv}")
-
+        db.create_symbol((LIB, cell_name, 'symbol'))
         sym_view         = cell.view('symbol')
         sym_design_write = sym_view.get_design(DesignMode.WRITE)
 
-        # Place one pin figure per schematic term, evenly spaced vertically
         sch_terms = list(design.terms)
-        print(f"  schematic terms: {[t.name for t in sch_terms]}")
+        print(f"  terms: {[t.name for t in sch_terms]}")
         y_spacing = 2.0
         y_start   = (len(sch_terms) - 1) * y_spacing / 2.0
         for idx, term in enumerate(sch_terms):
             y_pos = y_start - (idx * y_spacing)
             sym_design_write.add_pin_fig_for_term_type(term.term_type, (0.0, y_pos))
-            print(f"    '{term.name}' pin at (0.0, {y_pos})")
+            print(f"    '{term.name}' pin @ (0.0, {y_pos})")
 
         sym_design_write.save_design()
-        print(f"  symbol saved: {sym_lcv}")
+        print(f"  saved: {sym_lcv}")
 
     except Exception as e:
-        print(f"  [ERROR] symbol generation failed: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"  [ERROR] {type(e).__name__}: {e}")
+        import traceback; traceback.print_exc()
 
     print("\n=== Done ===")
     print(f"  Schematic : {lcv}")
     print(f"  Symbol    : {sym_lcv}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Placement coordinate helpers
+# Coordinates match .dem ground truth for RC bias topology.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Hard x-positions from .dem recording (unit: schematic user units)
+# Extend this table when adding new topologies.
+_SHUNT_X  = {0: 2.875}   # first shunt component at x=2.875
+_SERIES_X = {0: 4.25}    # first series component at x=4.25
+_PORT_LEFT  = 1.375       # port 1 (input) wire endpoint x
+_PORT_RIGHT = 5.25        # port 2 (output) wire endpoint x
+
+
+def _shunt_xy(comp, series):
+    """Return (x, y) for a shunt component. y=0 (on signal wire)."""
+    # All shunts share the same x-position lookup (index 0 for single-shunt topologies).
+    # For multi-shunt topologies, extend _SHUNT_X with additional indices.
+    return (_SHUNT_X.get(0, 2.875), 0.0)
+
+
+def _series_xy(comp, shunts, series):
+    """Return (x, y) for a series component. y=0 (on signal wire)."""
+    idx = series.index(comp)
+    return (_SERIES_X.get(idx, 4.25 + idx * 2.0), 0.0)
+
+
+def _port_xs(ports, series, shunts):
+    """Return {'left': x, 'right': x} for the two port pin wire endpoints."""
+    return {'left': _PORT_LEFT, 'right': _PORT_RIGHT}
 
 
 if __name__ == '__main__':
