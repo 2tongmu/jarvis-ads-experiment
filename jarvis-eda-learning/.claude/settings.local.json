@@ -6,7 +6,8 @@
       "Bash(\"/mnt/c/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
       "Bash(\"C:/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
       "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
-      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pip install pytest)"
+      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pip install pytest)",
+      "Bash(grep -E \"\\(^[^/]*de\\\\.py$|__init__\\\\.py|db_uu\\\\.py\\)\")"
     ]
   }
 }
