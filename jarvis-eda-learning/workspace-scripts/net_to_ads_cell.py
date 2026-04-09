@@ -288,12 +288,12 @@ def main(net_path: Path):
         else:
             port_x[port['net']] = final_x + GRID_X
 
-    # Main horizontal wire at y=0: left port → right port
+    # Main horizontal wire at y=0: left port -> right port
     if ordered and left_net and right_net:
         lx = port_x.get(left_net, 0.0)
         rx = port_x.get(right_net, final_x)
         design.add_wire([(lx, 0.0), (rx, 0.0)])
-        print(f"  main wire: ({lx:.2f}, 0.0) → ({rx:.2f}, 0.0)")
+        print(f"  main wire: ({lx:.2f}, 0.0) -> ({rx:.2f}, 0.0)")
 
     # Shunt wires: from main wire (y=0) down through component to GND
     for comp in shunts:
@@ -301,7 +301,7 @@ def main(net_path: Path):
         gnd_p = gnd_markers.get(f'GND_{comp["name"]}')
         if gnd_p:
             design.add_wire([(p['x'], 0.0), (p['x'], gnd_p['y'])])
-            print(f"  shunt wire: ({p['x']:.2f}, 0.0) → ({p['x']:.2f}, {gnd_p['y']:.2f})")
+            print(f"  shunt wire: ({p['x']:.2f}, 0.0) -> ({p['x']:.2f}, {gnd_p['y']:.2f})")
 
     # ── Design variables from .param ───────────────────────────────────────────
     if params:
