@@ -1,16 +1,14 @@
 # ADS Python API Reference
 
-Derived from reading ADS 2026 Update 1.2 source at:
-`C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/packages/keysight/ads/de/`
+**Status key:**
+- ✅ CONFIRMED — verified by Jarvis execution on ADS 2026 Update 1 (2026-04-08)
+- ⚠️ UNCONFIRMED — from source stubs / static analysis only; may be wrong
 
-**Confirmed by Jarvis execution 2026-04-08** — corrections from
-`ads_bias_subcell_create.py` applied and verified against the running API.
-Same API applies to ADS 2026 Update 1 (Jarvis). Core module `_pde` is compiled
-(`.pyd`); signatures come from `.pyi` stubs and Python wrapper files.
+Applies to: ADS 2026 Update 1 (Jarvis), ADS 2026 Update 1.2 (local dev).
+Core `_pde` module is compiled (`.pyd`); signatures from `.pyi` stubs.
 
-> **Critical note:** The `de_*` function names seen in `.dem` macro recordings are
-> AEL (ADS Extension Language) calls, not Python. The Python API is fully
-> object-oriented. Do not use `de_init_item`, `de_place_item`, etc. in Python scripts.
+> **Critical:** `.dem` macro recordings use AEL function calls — not Python.
+> Do not use `de_init_item`, `de_place_item`, etc. in scripts. See §13.
 
 ---
 
@@ -19,23 +17,31 @@ Same API applies to ADS 2026 Update 1 (Jarvis). Core module `_pde` is compiled
 ```python
 import keysight.ads.de as de
 from keysight.ads.de import db_uu as db
-from keysight.ads.de._pde.db import TermType, DesignMode   # ✅ confirmed path
-from keysight.ads.de.db import MirrorType, Orientation, LibraryMode
+from keysight.ads.de._pde.db import TermType, DesignMode   # ✅ CONFIRMED
+from keysight.ads.de.db import MirrorType, Orientation, LibraryMode  # ⚠️ UNCONFIRMED
 ```
 
-> **Note:** `TermType` and `DesignMode` live in the private `_pde.db` submodule,
-> not the public `db` module. Import from `_pde.db` as shown above.
+> `TermType` and `DesignMode` are in `_pde.db` (private submodule), **not** the
+> public `keysight.ads.de.db`. Importing from the wrong module silently fails.
 
 ---
 
 ## 1. Workspace
 
 ```python
-de.create_workspace(path: str) -> None       # create new workspace
-de.open_workspace(path: str) -> Workspace    # open existing workspace
-de.close_workspace() -> None
-de.workspace_is_open() -> bool
-de.workspace_directory() -> str
+de.open_workspace(path: str) -> Workspace    # ✅ CONFIRMED
+de.create_workspace(path: str) -> None       # ⚠️ UNCONFIRMED
+de.close_workspace() -> None                 # ⚠️ UNCONFIRMED
+de.workspace_is_open() -> bool               # ⚠️ UNCONFIRMED
+de.workspace_directory() -> str              # ⚠️ UNCONFIRMED
+```
+
+Suppress benign vtb.defs warnings with:
+```python
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    ws = de.open_workspace(WORKSPACE)   # ✅ CONFIRMED
 ```
 
 ---
@@ -43,24 +49,26 @@ de.workspace_directory() -> str
 ## 2. Library
 
 ```python
-de.create_new_library(lib_name: str, lib_path: str) -> Library
-de.open_library(lib_name: str, lib_path: str, mode: LibraryMode) -> Library
-de.get_open_library(lib_name: str) -> Library
-de.library_exists_at_path(path: str) -> bool
-de.library_is_open(lib_name: str) -> bool
-de.close_library(lib_name: str) -> None
+de.get_open_library(lib_name: str) -> Library        # ✅ CONFIRMED
+lib.cell_exists(cell_name: str) -> bool              # ✅ CONFIRMED
+lib.cell(cell_name: str) -> Cell                     # ✅ CONFIRMED
+de.Cell.create(lib, cell_name: str) -> Cell          # ✅ CONFIRMED
+
+de.create_new_library(lib_name, lib_path) -> Library # ⚠️ UNCONFIRMED
+de.open_library(lib_name, lib_path, mode) -> Library # ⚠️ UNCONFIRMED
+de.library_exists_at_path(path: str) -> bool         # ⚠️ UNCONFIRMED
+de.library_is_open(lib_name: str) -> bool            # ⚠️ UNCONFIRMED
+de.close_library(lib_name: str) -> None              # ⚠️ UNCONFIRMED
 ```
 
 ---
 
-## 3. Design / View creation  ✅ confirmed
+## 3. Design / View creation  ✅ CONFIRMED
 
-`CellviewRefLike` accepts `"lib:cell:view"` string, `("lib","cell","view")` tuple, or `LCVName`.
+Full confirmed pattern for creating a schematic:
 
-**Confirmed pattern (Jarvis 2026-04-08):**
 ```python
-# Get existing library (already in workspace)
-lib = de.get_open_library(lib_name) -> Library
+lib = de.get_open_library(lib_name)
 
 # Get or create cell
 if lib.cell_exists(cell_name):
@@ -68,212 +76,188 @@ if lib.cell_exists(cell_name):
 else:
     cell = de.Cell.create(lib, cell_name)
 
-# Create view (delete first if recreating)
+# Recreate view from scratch (delete if exists)
 if cell.view_exists('schematic'):
-    cell.delete_view('schematic')
-sch_view = de.View.create(cell, 'schematic', 'schematic') -> View
+    cell.delete_view('schematic')          # ✅ CONFIRMED
+sch_view = de.View.create(cell, 'schematic', 'schematic')  # ✅ CONFIRMED
 
-# Get design in WRITE mode — CRITICAL: default is READ_ONLY, cannot save
-design = sch_view.get_design(DesignMode.WRITE) -> Design
+# CRITICAL: must open in WRITE mode — default READ_ONLY cannot save
+design = sch_view.get_design(DesignMode.WRITE)  # ✅ CONFIRMED
 ```
 
-For symbols and layouts:
+For symbols:
 ```python
-symbol_design = db.create_symbol((lib_name, cell_name, 'symbol')) -> Design
-sym_view      = cell.view('symbol')
-sym_write     = sym_view.get_design(DesignMode.WRITE) -> Design
+symbol_design = db.create_symbol((lib_name, cell_name, 'symbol'))  # ✅ CONFIRMED
+sym_view      = cell.view('symbol')                                  # ✅ CONFIRMED
+sym_write     = sym_view.get_design(DesignMode.WRITE)               # ✅ CONFIRMED
 ```
 
-Save:
+Saving:
 ```python
-design.save_design() -> None          # ✅ confirmed — must be called explicitly
+design.save_design()   # ✅ CONFIRMED — must be called; changes are not auto-saved
 ```
 
 ---
 
-## 4. Placing instances (components)  ✅ confirmed
+## 4. Placing instances  ✅ CONFIRMED
 
 ```python
-# Place via the design object — confirmed API
 inst = design.add_instance(
-    master = de.LCVName(lib, cell, view),  # ✅ use de.LCVName, not string
-    origin = (x, y),                       # tuple of floats (user units)
-    name   = "R1",                         # instance name
-    angle  = 0.0,                          # rotation degrees
-) -> Instance
+    de.LCVName(lib, cell, view),   # ✅ CONFIRMED — use LCVName, not bare string
+    (x, y),                        # origin as tuple of floats (user units)
+    name  = "R1",
+    angle = 0.0,                   # rotation in degrees (0=default, 90=rotated, etc.)
+)
 ```
 
-Parameters — use dict-style access with `.value` setter:
+Setting parameters — dict access with `.value`:
 ```python
-inst.parameters["R"].value = "Rs"    # ✅ confirmed — sets to variable expression
-inst.parameters["C"].value = "Cp"
+inst.parameters["R"].value = "Rs"   # ✅ CONFIRMED — assigns design variable expression
+inst.parameters["C"].value = "Cp"   # ✅ CONFIRMED
 ```
 
-> **NOT** `inst.pcell_parameters[key] = value` — that API exists but
-> `parameters[key].value` is the confirmed working form.
+> **NOT** `inst.pcell_parameters[key] = value` — `parameters[key].value` is confirmed.
 
 ---
 
-## 5. Nets  ✅ confirmed
+## 5. Nets  ✅ CONFIRMED
 
 ```python
-net = design.find_or_add_net("net_name") -> Net   # ✅ confirmed
+net = design.find_or_add_net("net_name")   # ✅ CONFIRMED
+# Idempotent: returns existing net if the name already exists.
 ```
 
-> **NOT** `ScalarNet(design=schematic, name=...)` — use `design.find_or_add_net()`.
-> This is idempotent: returns existing net if name already exists.
+> **NOT** `ScalarNet(design=schematic, name=...)`.
 
 ---
 
-## 6. Terminals (cell ports / generic pins)  ✅ confirmed
+## 6. Terminals (cell ports)  ✅ CONFIRMED
 
-Terminals define the cell's external interface. Use `design.add_term()` — **not**
-`ads_simulation:Term` (simulation component only) and **not** `ScalarTerm()` constructor.
+Terminals are the cell's external interface — the sub-cell pin definition.
 
 ```python
 net  = design.find_or_add_net("port_name")
-term = design.add_term(net, "port_name", TermType.INPUT_OUTPUT) -> Term   # ✅ confirmed
+term = design.add_term(net, "port_name", TermType.INPUT_OUTPUT)  # ✅ CONFIRMED
+```
 
-# TermType values (from keysight.ads.de._pde.db):
-#   INPUT  OUTPUT  INPUT_OUTPUT  SWITCH  JUMPER  UNUSED  TRISTATE
+TermType values (from `keysight.ads.de._pde.db`):
+`INPUT` `OUTPUT` `INPUT_OUTPUT` `SWITCH` `JUMPER` `UNUSED` `TRISTATE`
 
-# Iterate all terms on a design (used for symbol generation):
-for term in design.terms:
+Iterating all terms on a design:
+```python
+for term in design.terms:   # ✅ CONFIRMED
     print(term.name, term.term_type)
 ```
 
+> **NOT** `ScalarTerm(net, name, term_type)` constructor.
+> **NOT** `ads_simulation:Term` — that is a simulation port component, not a cell pin.
+
 ---
 
-## 7. Pins (graphical port marker)  ✅ confirmed
+## 7. Symbol pin figures  ✅ CONFIRMED
 
-For schematic sub-cell pins, `add_pin_fig_for_term_type()` is the confirmed method.
-Use this on the **symbol** design to place a pin figure for each term.
+Place one pin figure per schematic term on the **symbol** design:
 
 ```python
-# On the symbol design (not schematic):
-sym_design_write.add_pin_fig_for_term_type(term.term_type, (x, y))  # ✅ confirmed
+# Create symbol design first (see §3)
+sch_terms = list(design.terms)   # ✅ CONFIRMED — reads terms from schematic design
 
-# Standard pin layout for blackbox: iterate schematic terms, place vertically
-sch_terms = list(design.terms)
 y_spacing = 2.0
 y_start   = (len(sch_terms) - 1) * y_spacing / 2.0
 for idx, term in enumerate(sch_terms):
     y_pos = y_start - (idx * y_spacing)
-    sym_design_write.add_pin_fig_for_term_type(term.term_type, (0.0, y_pos))
+    sym_write.add_pin_fig_for_term_type(term.term_type, (0.0, y_pos))  # ✅ CONFIRMED
+
+sym_write.save_design()   # ✅ CONFIRMED
 ```
 
-> The `Pin(term, [rect], ...)` constructor API exists in the stubs but
-> `add_pin_fig_for_term_type()` is the confirmed working path.
+> `Pin(term, [rect], ...)` constructor exists in stubs but is ⚠️ UNCONFIRMED.
+> `de_generate_blackbox_symbol()` from `experimental` is ⚠️ UNCONFIRMED — Jarvis
+> used `add_pin_fig_for_term_type()` instead.
 
 ---
 
-## 8. Wiring  ✅ confirmed
+## 8. Wiring  ✅ CONFIRMED
 
 ```python
-# Add a wire as a list of (x, y) waypoints — ADS auto-connects to pins/terms
-design.add_wire([(x1, y1), (x2, y2), ...])   # ✅ confirmed
-
-# Multi-segment wire (one call = one polyline):
-design.add_wire([(0.0, 0.0), (2.875, 0.0), (4.25, 0.0), (6.5, 0.0)])
+design.add_wire([(x1, y1), (x2, y2), ...])   # ✅ CONFIRMED
 ```
 
-> **NOT** `Line(design, layer, Outline([...]))` — use `design.add_wire()`.
-> Wire connectivity is position-based: wire endpoint must reach the component
-> pin or term snap-point. There is no explicit `wire.net = net` assignment needed.
+One call = one polyline. ADS auto-connects endpoints to component pins and terms
+based on position — no explicit net assignment needed.
+
+```python
+# Example: main horizontal path + shunt branch
+design.add_wire([(0.0, 0.0), (2.875, 0.0), (4.25, 0.0), (6.5, 0.0)])  # ✅ CONFIRMED
+design.add_wire([(2.875, 0.0), (2.875, -1.0)])                          # ✅ CONFIRMED
+```
+
+> **NOT** `Line(design, layer, Outline([...]))`.
 
 ---
 
-## 9. Design variables  ✅ confirmed
+## 9. Design variables  ✅ CONFIRMED
 
 ```python
-# Write design variables — list of (name, value_str) tuples
-design.cell.write_design_variables([
+design.cell.write_design_variables([   # ✅ CONFIRMED
     ("Rs", "1000 Ohm"),
     ("Cp", "1 pF"),
-])   # ✅ confirmed
+])
 
-# Read design variables
-design.cell.read_design_variables() -> list[tuple[str, str]]
+design.cell.read_design_variables()    # ⚠️ UNCONFIRMED (exists in stubs)
 ```
 
-> **NOT** `write_design_variables(design.cell, [...])` (module-level function) —
-> use the method `design.cell.write_design_variables([...])` directly.
+> **NOT** the module-level `write_design_variables(design.cell, [...])`.
 
 ---
 
-## 10. Symbol generation (blackbox)
+## 10. Enumerations
 
 ```python
-from keysight.ads.de.experimental.generate_symbol import de_generate_blackbox_symbol, OrderType
+from keysight.ads.de._pde.db import TermType, DesignMode  # ✅ CONFIRMED
 
-source_design = db_uu.open_design("lib:cell:schematic", DesignMode.READ_ONLY)
-symbol_design = db_uu.create_symbol("lib:cell:symbol")
+# DesignMode  ✅ CONFIRMED
+DesignMode.WRITE      # open design for modification
+DesignMode.READ_ONLY  # default — cannot save_design()
 
-de_generate_blackbox_symbol(
-    symbol_design       = symbol_design,
-    source_design       = source_design,
-    lead_len            = 0.25,               # pin lead length (user units)
-    lead_spacing        = 0.25,               # pin-to-pin spacing
-    is_dual_symbol_type = False,              # False=quad (4-side), True=dual (2-side)
-    replace             = False,              # True to replace existing symbol
-    order               = OrderType.ORDER_LOCATION,
-    add_ref             = False,
-    pin_shape           = "dot",              # "dot" | "square" | "round"
-    pin_one_warn_off    = False,
-    use_one_pin_per_em_port = False,
-    use_pin_net_text_label  = False,
-    use_single_line_body    = False,
-) -> None
-```
+# TermType  ✅ CONFIRMED
+TermType.INPUT_OUTPUT
+TermType.INPUT
+TermType.OUTPUT
 
-`OrderType` values: `ORDER_LOCATION`, `ORDER_NUMBER1`, `ORDER_NUMBER2`,
-`ORDER_NUMBER3`, `ORDER_NUMBER4`
-
----
-
-## 11. Key enumerations
-
-```python
-from keysight.ads.de.db import (
-    DesignMode,   # READ_ONLY  APPEND  OVERWRITE
-    MirrorType,   # NONE  MIRROR_X  MIRROR_Y
-    Orientation,  # R0  R90  R180  R270  MY  MYR90  MX  MXR90
-    TermType,     # INPUT  OUTPUT  INPUT_OUTPUT  SWITCH  JUMPER  UNUSED  TRISTATE
-    SignalType,   # SIGNAL  POWER  GROUND  CLOCK  TIE_OFF  TIE_HI  TIE_LO  ANALOG
-    LibraryMode,  # READ_ONLY  READ_WRITE
-)
+# The following exist in stubs but import paths are ⚠️ UNCONFIRMED:
+from keysight.ads.de.db import MirrorType, Orientation, SignalType, LibraryMode
 ```
 
 ---
 
-## 12. Component LCV names (ads_rflib)
+## 11. Component LCV names (ads_rflib)
 
-| Component | LCV string                   |
-|-----------|------------------------------|
-| Resistor  | `"ads_rflib:R:symbol"`       |
-| Capacitor | `"ads_rflib:C:symbol"`       |
-| Inductor  | `"ads_rflib:L:symbol"`       |
-| Ground    | `"ads_rflib:GROUND:symbol"`  |
-| Port/Term | `"ads_simulation:Term:symbol"` *(simulation only — not for cell ports)* |
+| Component | LCVName args                          | Status        |
+|-----------|---------------------------------------|---------------|
+| Resistor  | `de.LCVName('ads_rflib','R','symbol')`      | ✅ CONFIRMED |
+| Capacitor | `de.LCVName('ads_rflib','C','symbol')`      | ✅ CONFIRMED |
+| Ground    | `de.LCVName('ads_rflib','GROUND','symbol')` | ✅ CONFIRMED |
+| Inductor  | `de.LCVName('ads_rflib','L','symbol')`      | ⚠️ UNCONFIRMED |
+| Sim Port  | `de.LCVName('ads_simulation','Term','symbol')` | ⚠️ do NOT use for cell ports |
 
 ---
 
-## 13. AEL vs Python — what NOT to use in scripts
+## 12. AEL vs Python
 
-The `.dem` macro recorder outputs AEL function calls. These are **not** Python and
-will fail or produce wrong results in Python scripts:
+`.dem` macro recordings use AEL. Python equivalents (all ✅ CONFIRMED unless noted):
 
-| AEL (`.dem` — do not use)              | Python equivalent                         |
-|-----------------------------------------|-------------------------------------------|
-| `de_create_new_schematic_view(l,c,v)`  | `db_uu.create_schematic("l:c:v")`         |
-| `de_get_design_context_from_name(lcv)` | `db_uu.open_design(lcv)` (or just use the Design object) |
-| `de_init_item("lib:cell:view")`        | `Instance(design, master="lib:cell:view", ...)` |
-| `de_rotate_inc()` / `de_rotate_image()`| `angle=90.0` / `mirror=MirrorType.MIRROR_X` on `Instance` |
-| `de_place_item(item, x, y)`            | `inst.origin = (x, y)` or set in `Instance()` constructor |
-| `db_create_pin(ctx, x, y, rot, ...)`   | `ScalarTerm` + `Pin` + `Rect` (see §6–7) |
-| `de_connect()` / `de_add_wire(x,y)`    | `Line(design, layer, Outline([...]))`     |
-| `de_edit_item` / `de_set_item_parameters` | `inst.pcell_parameters[name] = value`  |
-| `de_update_item_ex` / `create_parm`    | `write_design_variables(cell, [...])`     |
-| `de_save_oa_design(lcv)`               | `design.save_design()`                    |
-| `de_create_new_symbol_view()`          | `db_uu.create_symbol("lib:cell:symbol")`  |
-| `de_generate_blackbox_symbol(...)`     | `de_generate_blackbox_symbol(...)` *(same name, different import — see §10)* |
+| AEL (`.dem` — do not use)                    | Confirmed Python equivalent                              |
+|----------------------------------------------|----------------------------------------------------------|
+| `de_create_new_schematic_view(l, c, v)`      | `de.View.create(cell, 'schematic', 'schematic')`         |
+| `de_get_design_context_from_name(lcv)`       | `sch_view.get_design(DesignMode.WRITE)`                  |
+| `de_init_item("lib:cell:view")`              | `de.LCVName(lib, cell, view)` as arg to `add_instance`  |
+| `de_rotate_inc()` / `de_rotate_image("DOWN")`| `angle=90.0` / `angle=180.0` on `add_instance`          |
+| `de_place_item(item, x, y)`                  | `design.add_instance(lcv_name, (x, y), name=, angle=)`  |
+| `db_create_pin(ctx, x, y, rot, ...)`         | `design.add_term(net, name, TermType)` (see §6)          |
+| `de_connect()` / `de_add_wire(x, y)`         | `design.add_wire([(x1,y1), (x2,y2), ...])`              |
+| `de_edit_item` / `de_set_item_parameters`    | `inst.parameters[key].value = expr`                     |
+| `de_update_item_ex` / `create_parm`          | `design.cell.write_design_variables([...])`              |
+| `de_save_oa_design(lcv)`                     | `design.save_design()`                                   |
+| `de_create_new_symbol_view()`                | `db.create_symbol((lib, cell, 'symbol'))`               |
+| `de_generate_blackbox_symbol(...)`           | `sym_write.add_pin_fig_for_term_type(...)` per term (§7) |
