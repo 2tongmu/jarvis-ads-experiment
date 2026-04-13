@@ -243,7 +243,75 @@ from keysight.ads.de.db import MirrorType, Orientation, SignalType, LibraryMode
 
 ---
 
-## 12. AEL vs Python
+## 12. Schematic Pin Placement  ⚠️ UNCONFIRMED (source analysis 2026-04-12)
+
+`add_term()` creates a netlist terminal but has **no graphical representation**.
+To make a pin visible on the schematic canvas, you must also create a `Dot` (PinFig)
+and link it to the term via `add_pin()`.
+
+**Root cause of "no pins visible" bug:** scripts called `add_term()` only — never
+called `add_pin()`. The term existed electrically but drew nothing on screen.
+
+### Layer ID
+
+The AEL `.dem` used `db_layerid(229)`. In Python, get the correct layer via:
+```python
+layer_id = design.get_layer_for_pin()   # ⚠️ UNCONFIRMED — returns LayerId for pin layer
+# Typically returns LayerId(229) for schematic context
+```
+
+### Full sequence for a visible schematic pin
+
+```python
+from keysight.ads.de.db_uu import ScalarTerm, Dot   # ⚠️ UNCONFIRMED import path
+
+# 1. Net
+net = design.find_or_add_net("pin_name")             # ✅ CONFIRMED
+
+# 2. Netlist terminal (electrical, not visible by itself)
+term = design.add_term(net, "pin_name", TermType.INPUT_OUTPUT)  # ✅ CONFIRMED
+# OR: term = ScalarTerm(net, "pin_name")             # ⚠️ UNCONFIRMED
+
+# 3. Visual pin marker (the dot on the canvas)
+layer_id = design.get_layer_for_pin()                # ⚠️ UNCONFIRMED
+dot = design.add_dot_for_pin((x, y))                 # ⚠️ UNCONFIRMED
+
+# 4. Link visual marker to term
+pin = design.add_pin(term, dot, angle=rotation, add_annot=True)  # ⚠️ UNCONFIRMED
+```
+
+### Classes (from source stubs — ⚠️ UNCONFIRMED)
+
+```
+Pin(term, pin_figs, *, angle=0.0, add_annot=True)
+    # pin_figs: PinFig | list[PinFig]
+
+Dot(design, layer_id, loc)
+    # Subclass of PinFig; the visible dot marker on canvas
+
+design.add_dot_for_pin(location) -> Dot
+design.add_pin(term, pin_figs, *, angle=0.0, add_annot=True) -> Pin
+design.add_pin_fig_for_term_type(term_type, location) -> PinFig   # ✅ CONFIRMED (symbol only)
+```
+
+### AEL → Python mapping
+
+| AEL | Python |
+|-----|--------|
+| `db_create_pin(ctx, x, y, rot, db_layerid(229), 0, "name", 2)` | `design.add_term(net, name, TermType)` + `design.add_dot_for_pin((x,y))` + `design.add_pin(term, dot, angle=rot)` |
+
+### Source file locations
+
+| File | Lines | Content |
+|------|-------|---------|
+| `db_uu/_db_x.py` | 4038–4260 | `Pin` class |
+| `db_uu/_db_x.py` | 2565–2611 | `Dot` class |
+| `db_uu/_design.py` | 793–1098 | `add_pin`, `add_dot_for_pin`, `get_layer_for_pin` methods |
+| `_pde/db/__init__.pyi` | 910–1481 | `add_pin_fig_for_term_type` stub |
+
+---
+
+## 13. AEL vs Python
 
 `.dem` macro recordings use AEL. Python equivalents (all ✅ CONFIRMED unless noted):
 
@@ -254,7 +322,7 @@ from keysight.ads.de.db import MirrorType, Orientation, SignalType, LibraryMode
 | `de_init_item("lib:cell:view")`              | `de.LCVName(lib, cell, view)` as arg to `add_instance`  |
 | `de_rotate_inc()` / `de_rotate_image("DOWN")`| `angle=90.0` / `angle=180.0` on `add_instance`          |
 | `de_place_item(item, x, y)`                  | `design.add_instance(lcv_name, (x, y), name=, angle=)`  |
-| `db_create_pin(ctx, x, y, rot, ...)`         | `design.add_term(net, name, TermType)` (see §6)          |
+| `db_create_pin(ctx, x, y, rot, db_layerid(229), 0, "name", 2)` | `add_term` + `add_dot_for_pin((x,y))` + `add_pin(term, dot, angle=rot)` — see §12 |
 | `de_connect()` / `de_add_wire(x, y)`         | `design.add_wire([(x1,y1), (x2,y2), ...])`              |
 | `de_edit_item` / `de_set_item_parameters`    | `inst.parameters[key].value = expr`                     |
 | `de_update_item_ex` / `create_parm`          | `design.cell.write_design_variables([...])`              |
