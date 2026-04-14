@@ -1,0 +1,194 @@
+# schemas/research_netlist.yaml
+# Definition of the research netlist dialect accepted by net2ads.
+# This is NOT generic SPICE. See CONSTRAINTS.md C2.
+#
+# Source examples:
+#   examples/rc_series_shunt/rc_series_shunt_research.net
+#   examples/t_network_lcl/t_network_lcl_research.net
+#   examples/two_quarter_wave_lines/two_quarter_wave_lines_research.net
+#   examples/spdt_switch/spdt_switch_research.net
+
+dialect: research_netlist
+version: "1.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Syntax rules
+# ─────────────────────────────────────────────────────────────────────────────
+syntax:
+  comment_char: ";"           # lines starting with ; are comments
+  ground_node: "0"            # ground node is always named "0"
+  case_sensitive: false       # node names and keywords are case-insensitive
+
+  subcircuit_wrapper:
+    open:  ".SUBCKT <cell_name> <port1> <port2> ... 0"
+    close: ".ENDS <cell_name>"
+    required: true            # all research netlists must use .SUBCKT wrapper
+    note: >
+      The trailing "0" in .SUBCKT port list is the ground node.
+      It is implicit in the topology — not treated as a signal port.
+
+  component_syntax: "<Type>:<InstanceName>  <node1>  <node2>  [<param>=<value> ...]"
+  port_syntax:      "PORT:<name>  <node>"
+
+  parameter_format:
+    style: "key=value"
+    value_formats:
+      - "50 Ohm"        # numeric + unit suffix (preferred)
+      - "7.958 nH"
+      - "1.2 pF"
+      - "90 deg"
+      - "ON"            # string values for SW State parameter
+      - "OFF"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Supported element types by phase
+# ─────────────────────────────────────────────────────────────────────────────
+elements:
+
+  - type: R
+    phase: 1
+    description: Ideal resistor
+    nodes: [node1, node2]
+    parameters:
+      R:
+        description: Resistance
+        units: Ohm
+        required: true
+        example: "50 Ohm"
+
+  - type: L
+    phase: 1
+    description: Ideal inductor
+    nodes: [node1, node2]
+    parameters:
+      L:
+        description: Inductance
+        units: nH, pH
+        required: true
+        example: "7.958 nH"
+
+  - type: C
+    phase: 1
+    description: Ideal capacitor
+    nodes: [node1, node2]
+    parameters:
+      C:
+        description: Capacitance
+        units: pF, fF
+        required: true
+        example: "1.2 pF"
+
+  - type: TLIN
+    phase: 2
+    description: Ideal transmission line (electrical length)
+    nodes: [node1, node2]
+    parameters:
+      Z0:
+        description: Characteristic impedance
+        units: Ohm
+        required: true
+        example: "50 Ohm"
+      ELength:
+        description: Electrical length
+        units: deg
+        required: true
+        example: "90 deg"
+      Fref:
+        description: Reference frequency for electrical length
+        units: GHz, MHz
+        required: true
+        example: "10 GHz"
+
+  - type: SW
+    phase: 3
+    description: Abstract switch element (topological placeholder)
+    nodes: [node1, node2]
+    parameters:
+      State:
+        description: Switch state for this analysis
+        values: [ON, OFF]
+        required: true
+        example: "State=ON"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Port declaration
+# ─────────────────────────────────────────────────────────────────────────────
+port:
+  syntax: "PORT:<name>  <node>"
+  description: >
+    Declares an external port of the subcircuit.
+    Maps to design.add_term(net, name, TermType.INPUT_OUTPUT) in ADS.
+    Does NOT map to ADS simulation Term component — that is out of scope.
+  fields:
+    name:
+      description: Port identifier (also used as net name and terminal name)
+      example: P1
+    node:
+      description: Internal node connected to this port
+      example: P1
+  note: >
+    Port name and node name are typically identical in research netlists.
+    The translator uses the port name as both the ADS net name and term name.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unsupported constructs (emit warning, skip line)
+# ─────────────────────────────────────────────────────────────────────────────
+unsupported:
+  - keyword: ".AC"
+    reason: "Simulation setup — out of scope (CONSTRAINTS.md C1)"
+  - keyword: ".DC"
+    reason: "Simulation setup — out of scope (CONSTRAINTS.md C1)"
+  - keyword: ".TRAN"
+    reason: "Simulation setup — out of scope (CONSTRAINTS.md C1)"
+  - keyword: ".SP"
+    reason: "Simulation setup — out of scope (CONSTRAINTS.md C1)"
+  - keyword: ".HB"
+    reason: "Simulation setup — out of scope (CONSTRAINTS.md C1)"
+  - keyword: "S_Param:"
+    reason: "ADS simulation controller — out of scope (CONSTRAINTS.md C1)"
+  - keyword: "SweepPlan:"
+    reason: "Simulation sweep — out of scope (CONSTRAINTS.md C1)"
+  - keyword: "OutputPlan:"
+    reason: "Simulation output — out of scope (CONSTRAINTS.md C1)"
+  - keyword: "Term:"
+    reason: "ADS simulation port — out of scope (CONSTRAINTS.md C1)"
+  - keyword: ".model"
+    reason: "SPICE model card — not part of research dialect"
+  - keyword: ".include"
+    reason: "File inclusion — not supported; all content must be inline"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unit suffix table
+# ─────────────────────────────────────────────────────────────────────────────
+unit_suffixes:
+  resistance:
+    - suffix: "Ohm"
+      multiplier: 1.0
+    - suffix: "kOhm"
+      multiplier: 1.0e3
+    - suffix: "MOhm"
+      multiplier: 1.0e6
+  inductance:
+    - suffix: "nH"
+      multiplier: 1.0e-9
+    - suffix: "pH"
+      multiplier: 1.0e-12
+    - suffix: "uH"
+      multiplier: 1.0e-6
+  capacitance:
+    - suffix: "pF"
+      multiplier: 1.0e-12
+    - suffix: "fF"
+      multiplier: 1.0e-15
+    - suffix: "nF"
+      multiplier: 1.0e-9
+  frequency:
+    - suffix: "GHz"
+      multiplier: 1.0e9
+    - suffix: "MHz"
+      multiplier: 1.0e6
+    - suffix: "Hz"
+      multiplier: 1.0
+  angle:
+    - suffix: "deg"
+      multiplier: 1.0      # stored as degrees in IR

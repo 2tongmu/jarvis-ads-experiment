@@ -1,0 +1,28 @@
+; ================================================================
+; t_network_lcl_research.net
+; Research netlist -- LCL T-network low-pass filter
+; Purpose: experiment input for net2ads flow
+; Scope: topology + ports + nominal values only, no simulation setup
+;
+; Topology:
+;   Port1 -- L1(series) -- node_mid -- L2(series) -- Port2
+;                              |
+;                              C1(shunt)
+;                              |
+;                             GND
+; ================================================================
+
+.SUBCKT T_NETWORK_LCL P1 P2 0
+
+; -- Ports -------------------------------------------------------
+PORT:P1  P1
+PORT:P2  P2
+
+; -- Functional grouping: series path ----------------------------
+L:L1_SER  P1     N_MID   L=3.3 nH
+L:L2_SER  N_MID  P2      L=3.3 nH
+
+; -- Functional grouping: shunt branch ---------------------------
+C:C1_SH   N_MID  0       C=1.2 pF
+
+.ENDS T_NETWORK_LCL

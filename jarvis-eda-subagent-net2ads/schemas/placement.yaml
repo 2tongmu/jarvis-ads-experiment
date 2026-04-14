@@ -1,0 +1,245 @@
+# schemas/placement.yaml
+# Placement rules and output schema for net2ads Stage 3.
+#
+# Section A: Rules — how the placement engine computes coordinates.
+# Section B: Output schema — structure of <name>_placement.yaml artifacts.
+#
+# Coordinate ground truth sourced from:
+#   ../jarvis-eda-learning/workspace-scripts/net_to_ads_cell.py
+#   ../jarvis-eda-learning/workspace-scripts/ads_build_spdt_pdk.py
+#   ../jarvis-eda-learning/workspace-scripts/ads_bias_subcell_create.py
+
+schema_name: net2ads_placement
+schema_version: "1.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section A: Placement rules
+# ─────────────────────────────────────────────────────────────────────────────
+rules:
+
+  coordinate_system:
+    description: >
+      ADS schematic uses unitless "schematic units" for component placement.
+      The mapping to mils is approximately 100 mils per unit (unverified — see MEMORY.md OI-08).
+      All coordinates in this file are in schematic units.
+    x_direction: left to right (signal flows left to right)
+    y_direction: up is positive; down is negative
+    ground_level: y = 0.0  (GND symbols are at y = -1.0)
+    signal_path_y: y = 0.0
+
+  port_positions:
+    description: >
+      Port wire endpoints are placed at fixed x positions relative to the circuit.
+      Confirmed from net_to_ads_cell.py constants _PORT_LEFT, _PORT_RIGHT.
+    port_1:
+      x: 1.375
+      y: 0.0
+      description: Left port (input) — wire endpoint
+    port_2_formula:
+      description: >
+        Right port x = x of last backbone component's right pin + 1.0.
+        For standard 1-shunt + 1-series topology:
+          right_port_x = 5.25 (confirmed from net_to_ads_cell.py _PORT_RIGHT)
+      default: 5.25
+      formula: "last_series_x + 1.0"
+    port_3_formula:
+      description: "3-port circuits only (Phase 3 SPDT). TBD."
+      note: "⚠ Not yet defined — Phase 3 work item. See MEMORY.md OI-07."
+
+  series_component_positions:
+    description: >
+      Series components (role=series, tline) are placed on the signal path (y=0).
+      X positions are assigned left to right following the backbone node order.
+      Spacing between consecutive series components: 2.0 units.
+    first_position:
+      x: 4.25     # confirmed from net_to_ads_cell.py _SERIES_X[0]
+      y: 0.0
+      note: "First series component in a circuit with one preceding shunt branch"
+    additional_positions:
+      formula: "x_prev_series + 2.0"
+      note: "Each subsequent series component is 2.0 units to the right"
+    no_shunt_first_position:
+      x: 2.875    # if signal path starts directly with series (no preceding shunt)
+      y: 0.0
+      note: "Adjust based on circuit topology"
+
+  shunt_component_positions:
+    description: >
+      Shunt components (role=shunt, one node = "0") are placed at their tap node x position.
+      The shunt component sits on the signal path (y=0) and the GND symbol is below it.
+    first_position:
+      x: 2.875    # confirmed from net_to_ads_cell.py _SHUNT_X[0], ads_bias_subcell_create.py
+      y: 0.0
+    additional_positions:
+      formula: "x_prev_shunt + 2.0"
+      note: "Each subsequent shunt is 2.0 units to the right (for multi-shunt topologies)"
+    gnd_symbol:
+      x: same as shunt component
+      y: -1.0     # 1 unit below signal path, confirmed from ads_bias_subcell_create.py
+
+  component_angles:
+    description: >
+      Rotation angles for each component role.
+      Confirmed from ads_build_spdt_pdk.py mkR(), mkC(), mkGnd().
+    R_series:   0.0     # horizontal
+    L_series:   0.0     # horizontal (assumed — not Jarvis-confirmed)
+    C_series:   0.0     # horizontal
+    C_shunt:   -90.0    # vertical, pin1 at signal node (confirmed)
+    R_shunt:   -90.0    # vertical
+    L_shunt:   -90.0    # vertical (assumed)
+    GND:       -90.0    # confirmed from ads_build_spdt_pdk.py
+    TLIN:       0.0     # horizontal
+
+  wire_routing:
+    description: >
+      Wire rules for connecting components on the schematic canvas.
+      Sourced from ADS_API_REFERENCE.md §8 and net_to_ads_cell.py wire generation.
+    main_wire:
+      description: >
+        Single horizontal polyline at y=0 connecting all backbone waypoints.
+        Waypoints = sorted union of {left_port_x, right_port_x} ∪ {all shunt_xs} ∪ {all series_xs}.
+        ADS auto-connects wire endpoints to component pins when they coincide.
+      api: "design.add_wire([(x, 0.0) for x in sorted_waypoints])"
+    shunt_wires:
+      description: >
+        One vertical wire per shunt branch, from signal path down to GND level.
+      api: "design.add_wire([(shunt_x, 0.0), (shunt_x, -1.0)])"
+    wire_endpoint_precision:
+      note: >
+        Wire endpoints must EXACTLY match component pin snap_points.
+        ADS places components silently even when wires miss pins.
+        Use confirmed coordinate values from MEMORY.md Section 2.
+
+  multi_port_rules:
+    two_port:
+      description: Standard 2-port: left-to-right signal flow
+      port_1_x: 1.375
+      port_2_x: computed
+    three_port:
+      description: "⚠ Phase 3 — not yet defined. Placeholder."
+      note: "SPDT switch has 1 input + 2 outputs. Placement geometry TBD in Phase 3."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section B: Output schema (<name>_placement.yaml)
+# ─────────────────────────────────────────────────────────────────────────────
+output_schema:
+  description: >
+    Structure of the placement plan artifact written to disk by placement_engine.py.
+    This file is the input to the ADS build step (it drives the add_instance calls).
+
+  top_level_fields:
+    cell_name:
+      type: string
+      example: "RC_SERIES_SHUNT"
+    source_ir:
+      type: string
+      description: Path to the IR file this plan was generated from
+      example: "examples/rc_series_shunt/rc_series_shunt_research.yaml"
+    generation_timestamp:
+      type: string
+      example: "2026-04-13T09:05:00"
+
+  ports:
+    description: Port pin positions (wire endpoints for terms)
+    item_fields:
+      name: { type: string, example: "P1" }
+      node: { type: string, example: "P1" }
+      number: { type: integer, example: 1 }
+      x: { type: float, example: 1.375 }
+      y: { type: float, example: 0.0 }
+
+  instances:
+    description: One entry per component instance + one per GND symbol
+    item_fields:
+      id:
+        type: string
+        description: ADS instance name (same as IR component id)
+        example: "C1_SH"
+      ads_lib:  { type: string, example: "ads_rflib" }
+      ads_cell: { type: string, example: "C" }
+      ads_view: { type: string, example: "symbol" }
+      x: { type: float, example: 2.875 }
+      y: { type: float, example: 0.0 }
+      angle: { type: float, example: -90.0 }
+      params:
+        type: dict
+        example: { C: "2.0 pF" }
+      role:
+        type: string
+        values: [series, shunt, gnd, tline, switch]
+
+  wires:
+    description: Wire segments to add (each entry = one add_wire() call)
+    item_fields:
+      id: { type: string, example: "main_wire" }
+      points:
+        type: list[tuple[float, float]]
+        example: [[1.375, 0.0], [2.875, 0.0], [4.25, 0.0], [5.25, 0.0]]
+      note: { type: string, example: "main signal path" }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Example placement document (rc_series_shunt)
+# ─────────────────────────────────────────────────────────────────────────────
+example_document: |
+  cell_name: RC_SERIES_SHUNT
+  source_ir: examples/rc_series_shunt/rc_series_shunt_ir.yaml
+  generation_timestamp: "2026-04-13T09:05:00"
+
+  ports:
+    - name: P1
+      node: P1
+      number: 1
+      x: 1.375
+      y: 0.0
+    - name: P2
+      node: P2
+      number: 2
+      x: 5.25
+      y: 0.0
+
+  instances:
+    - id: C1_SH
+      ads_lib: ads_rflib
+      ads_cell: C
+      ads_view: symbol
+      x: 2.875
+      y: 0.0
+      angle: -90.0
+      params: {C: "2.0 pF"}
+      role: shunt
+    - id: GND_C1_SH
+      ads_lib: ads_rflib
+      ads_cell: GROUND
+      ads_view: symbol
+      x: 2.875
+      y: -1.0
+      angle: -90.0
+      params: {}
+      role: gnd
+    - id: R1_SER
+      ads_lib: ads_rflib
+      ads_cell: R
+      ads_view: symbol
+      x: 4.25
+      y: 0.0
+      angle: 0.0
+      params: {R: "50 Ohm"}
+      role: series
+    - id: R_TIE
+      ads_lib: ads_rflib
+      ads_cell: R
+      ads_view: symbol
+      x: 4.25
+      y: 0.0
+      angle: 0.0
+      params: {R: "0 Ohm"}
+      role: series
+      note: "Zero-ohm tie resistor — may be omitted if nodes are directly connected"
+
+  wires:
+    - id: main_wire
+      points: [[1.375, 0.0], [2.875, 0.0], [4.25, 0.0], [5.25, 0.0]]
+      note: "main signal path P1 → shunt tap → R1_SER → P2"
+    - id: shunt_wire_C1_SH
+      points: [[2.875, 0.0], [2.875, -1.0]]
+      note: "shunt branch: C1_SH top to GND"

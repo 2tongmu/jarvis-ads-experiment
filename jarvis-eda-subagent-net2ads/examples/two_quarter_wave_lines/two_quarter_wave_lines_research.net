@@ -1,0 +1,26 @@
+; ================================================================
+; two_quarter_wave_lines_research.net
+; Research netlist -- cascaded two quarter-wave transmission lines
+; Purpose: experiment input for net2ads flow
+; Scope: topology + ports + nominal values only, no simulation setup
+;
+; Topology:
+;   Port1 -- TLIN1(lambda/4) -- node_mid -- TLIN2(lambda/4) -- Port2
+;
+; Notes:
+;   Electrical length is expressed explicitly for topology intent.
+;   The later ADS-oriented translation step can map TLIN to the proper
+;   ADS transmission-line primitive and technology-specific parameters.
+; ================================================================
+
+.SUBCKT TWO_QW_TLINES P1 P2 0
+
+; -- Ports -------------------------------------------------------
+PORT:P1  P1
+PORT:P2  P2
+
+; -- Functional grouping: cascaded transmission lines ------------
+TLIN:TL1  P1      N_MID   Z0=50 Ohm   ELength=90 deg   Fref=10 GHz
+TLIN:TL2  N_MID   P2      Z0=70.7 Ohm ELength=90 deg   Fref=10 GHz
+
+.ENDS TWO_QW_TLINES

@@ -1,0 +1,30 @@
+; ================================================================
+; rc_series_shunt_research.net
+; Research netlist -- RC network with series resistor and shunt capacitor
+; Purpose: experiment input for net2ads flow
+; Scope: topology + ports + nominal values only, no simulation setup
+;
+; Topology:
+;   Port1 -- R1(series) -- node_out -- Port2
+;                               |
+;                               C1(shunt)
+;                               |
+;                              GND
+; ================================================================
+
+.SUBCKT RC_SERIES_SHUNT P1 P2 0
+
+; -- Ports -------------------------------------------------------
+PORT:P1  P1
+PORT:P2  P2
+
+; -- Functional grouping: series path ----------------------------
+R:R1_SER  P1      N_OUT   R=50 Ohm
+
+; -- Functional grouping: shunt branch ---------------------------
+C:C1_SH   N_OUT   0       C=2.0 pF
+
+; -- Output tie --------------------------------------------------
+R:R_TIE   N_OUT   P2      R=0 Ohm
+
+.ENDS RC_SERIES_SHUNT

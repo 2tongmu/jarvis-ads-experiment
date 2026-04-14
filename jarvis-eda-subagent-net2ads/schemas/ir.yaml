@@ -1,0 +1,248 @@
+# schemas/ir.yaml
+# Intermediate Representation (IR) schema — output of Stage 1 (parser + ir_builder).
+# Written to <name>_ir.yaml before Stage 2 begins (CONSTRAINTS.md C5).
+#
+# The IR is a normalized, directed graph of the circuit topology.
+# It contains no ADS-specific information — mapping happens in Stage 2.
+
+schema_name: net2ads_ir
+schema_version: "1.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Top-level structure (all fields required unless marked optional)
+# ─────────────────────────────────────────────────────────────────────────────
+top_level_fields:
+
+  cell_name:
+    type: string
+    description: Name of the subcircuit (from .SUBCKT header)
+    example: "RC_SERIES_SHUNT"
+
+  source_file:
+    type: string
+    description: Path to the research netlist that was parsed
+    example: "examples/rc_series_shunt/rc_series_shunt_research.net"
+
+  parse_timestamp:
+    type: string
+    description: ISO-8601 timestamp of parse run
+    example: "2026-04-13T09:00:00"
+
+  phase_required:
+    type: integer
+    description: Minimum phase needed to fully translate this IR (1, 2, or 3)
+    example: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ports
+# ─────────────────────────────────────────────────────────────────────────────
+ports:
+  description: >
+    List of external ports declared with PORT: in the research netlist.
+    Order matches declaration order in the netlist.
+    Maps to ADS design.add_term() calls.
+  item_fields:
+    name:
+      type: string
+      description: Port name (also used as ADS term name and net name)
+      example: "P1"
+    node:
+      type: string
+      description: Internal node this port is connected to
+      example: "P1"
+    number:
+      type: integer
+      description: Port number (1-indexed, in declaration order)
+      example: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Nodes
+# ─────────────────────────────────────────────────────────────────────────────
+nodes:
+  description: >
+    All unique node names in the circuit (excluding "0"/GND).
+    Derived from the union of all component node references.
+  item_fields:
+    name:
+      type: string
+      description: Node identifier (as it appears in the netlist)
+      example: "N_MID"
+    is_port:
+      type: boolean
+      description: True if this node is also declared as a PORT
+    connects_to_ground:
+      type: boolean
+      description: >
+        True if this node has any component directly connecting it to node "0".
+        Used to identify shunt branch tap points.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Components
+# ─────────────────────────────────────────────────────────────────────────────
+components:
+  description: >
+    All component instances parsed from the research netlist.
+    Ordered by parse order, then alphabetically within the same position.
+  item_fields:
+    id:
+      type: string
+      description: Instance name as it appears in the netlist
+      example: "R1_SER"
+    type:
+      type: string
+      description: Element type (R, L, C, TLIN, SW)
+      example: "R"
+    nodes:
+      type: list[string]
+      description: "[node1, node2] — order matches netlist declaration"
+      example: ["P1", "N_OUT"]
+    params:
+      type: dict
+      description: "Parameter dict: {param_name: value_string_with_unit}"
+      example: {R: "50 Ohm"}
+    role:
+      type: string
+      description: >
+        Topology role, classified by ir_builder:
+          series  — both nodes are signal nodes (neither is "0")
+          shunt   — one node is "0" (ground)
+          tline   — type is TLIN (signal path, not shunt)
+          switch  — type is SW
+      values: [series, shunt, tline, switch]
+      example: "series"
+    phase_required:
+      type: integer
+      description: Phase required to map this element (1=R/L/C, 2=TLIN, 3=SW)
+      example: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Connectivity graph
+# ─────────────────────────────────────────────────────────────────────────────
+graph:
+  description: >
+    Adjacency representation of the circuit graph.
+    Used by the placement engine to determine component ordering and
+    identify the backbone (main signal path).
+  fields:
+    backbone:
+      type: list[string]
+      description: >
+        Ordered list of node names on the main signal path,
+        from port 1 to port 2 (left to right).
+      example: ["P1", "N_OUT", "P2"]
+    backbone_components:
+      type: list[string]
+      description: >
+        Ordered list of component IDs on the backbone (series + tline).
+      example: ["R1_SER"]
+    shunt_branches:
+      type: list
+      description: List of shunt branch definitions
+      item_fields:
+        tap_node:
+          type: string
+          description: Signal node where this shunt branch connects
+          example: "N_OUT"
+        component_id:
+          type: string
+          description: Component in the shunt branch
+          example: "C1_SH"
+    switch_arms:
+      type: list
+      description: List of switch elements (Phase 3)
+      item_fields:
+        component_id:
+          type: string
+          example: "SW_SERIES_A"
+        state:
+          type: string
+          values: [ON, OFF]
+          example: "ON"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Metadata
+# ─────────────────────────────────────────────────────────────────────────────
+metadata:
+  fields:
+    warnings:
+      type: list[string]
+      description: >
+        Non-fatal parse warnings (unsupported constructs, phase violations).
+        Each entry is a human-readable string.
+      example:
+        - "[WARN] Line 15: TLIN requires Phase 2 mapping — skipped"
+    port_count:
+      type: integer
+      example: 2
+    component_count:
+      type: integer
+      example: 3
+    series_count:
+      type: integer
+      example: 1
+    shunt_count:
+      type: integer
+      example: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Example IR document (rc_series_shunt)
+# ─────────────────────────────────────────────────────────────────────────────
+example_document: |
+  cell_name: RC_SERIES_SHUNT
+  source_file: examples/rc_series_shunt/rc_series_shunt_research.net
+  parse_timestamp: "2026-04-13T09:00:00"
+  phase_required: 1
+
+  ports:
+    - name: P1
+      node: P1
+      number: 1
+    - name: P2
+      node: P2
+      number: 2
+
+  nodes:
+    - name: P1
+      is_port: true
+      connects_to_ground: false
+    - name: N_OUT
+      is_port: false
+      connects_to_ground: true
+    - name: P2
+      is_port: true
+      connects_to_ground: false
+
+  components:
+    - id: R1_SER
+      type: R
+      nodes: [P1, N_OUT]
+      params: {R: "50 Ohm"}
+      role: series
+      phase_required: 1
+    - id: C1_SH
+      type: C
+      nodes: [N_OUT, "0"]
+      params: {C: "2.0 pF"}
+      role: shunt
+      phase_required: 1
+    - id: R_TIE
+      type: R
+      nodes: [N_OUT, P2]
+      params: {R: "0 Ohm"}
+      role: series
+      phase_required: 1
+
+  graph:
+    backbone: [P1, N_OUT, P2]
+    backbone_components: [R1_SER, R_TIE]
+    shunt_branches:
+      - tap_node: N_OUT
+        component_id: C1_SH
+    switch_arms: []
+
+  metadata:
+    warnings: []
+    port_count: 2
+    component_count: 3
+    series_count: 2
+    shunt_count: 1

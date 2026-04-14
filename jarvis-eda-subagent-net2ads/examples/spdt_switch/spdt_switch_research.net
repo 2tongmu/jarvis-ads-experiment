@@ -1,0 +1,59 @@
+; ================================================================
+; spdt_switch_research.net
+; Research netlist -- SPDT switch, idealized topology-level model
+; Purpose: experiment input for net2ads flow
+; Scope: topology + ports + nominal values only, no simulation setup
+;
+; Topology intent:
+;   SPDT with one input port and two output ports.
+;   Series devices connect the input path to the selected output.
+;   Shunt devices provide isolation / absorptive termination.
+;
+; State annotation for this example:
+;   Path A active: P1 -> P2
+;   Path B off:    P1 -/-> P3
+;
+; Notes:
+;   Device names are placeholders for later ADS / PDK mapping.
+;   The later ADS-oriented translation step can map:
+;     SW_SERIES_*  -> series FET implementation cells
+;     SW_SHUNT_*   -> shunt FET implementation cells
+;     RTERM_*      -> absorptive termination resistors
+; ================================================================
+
+.SUBCKT SPDT_SWITCH P1 P2 P3 0
+
+; -- Ports -------------------------------------------------------
+PORT:P1  P1
+PORT:P2  P2
+PORT:P3  P3
+
+; ================================================================
+; COMMON INPUT NODE
+; ================================================================
+R:RIN_PAD   P1      N_IN    R=0.05 Ohm
+L:LIN_PAD   N_IN    N_COM   L=10 pH
+
+; ================================================================
+; PATH A -- active branch to P2
+;   Series switch ON, shunt switch OFF
+; ================================================================
+SW:SW_SERIES_A   N_COM   N_A1    State=ON
+R:RPATH_A        N_A1    N_A2    R=0.10 Ohm
+L:LPATH_A        N_A2    N_A3    L=40 pH
+SW:SW_SHUNT_A    N_A3    N_AST   State=OFF
+R:RTERM_A        N_AST   0       R=50 Ohm
+R:ROUT_A         N_A3    P2      R=0.05 Ohm
+
+; ================================================================
+; PATH B -- off branch to P3
+;   Series switch OFF, shunt switch ON
+; ================================================================
+SW:SW_SERIES_B   N_COM   N_B1    State=OFF
+R:RPATH_B        N_B1    N_B2    R=0.10 Ohm
+L:LPATH_B        N_B2    N_B3    L=40 pH
+SW:SW_SHUNT_B    N_B3    N_BST   State=ON
+R:RTERM_B        N_BST   0       R=50 Ohm
+R:ROUT_B         N_B3    P3      R=0.05 Ohm
+
+.ENDS SPDT_SWITCH

@@ -1,0 +1,195 @@
+# schemas/ads_mapping.yaml
+# ADS component mapping rules for net2ads.
+# Controls how IR elements are translated to ADS library components.
+# Configurable without code changes — the translator loads this file at runtime.
+#
+# Reference: ../jarvis-eda-learning/workspace-scripts/ADS_API_REFERENCE.md
+# Reference: ../jarvis-eda-learning/pdk-configs/WIN_PP1029_core.yaml
+
+schema_name: ads_mapping
+schema_version: "1.0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADS environment defaults
+# ─────────────────────────────────────────────────────────────────────────────
+ads_environment:
+  python_interpreter:
+    jarvis:    "C:/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe"
+    local_dev: "C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe"
+    note: "Use jarvis path for production runs. See MEMORY.md for version note."
+
+  ads_dir:
+    jarvis:    "C:/Program Files/Keysight/ADS2026_Update1"
+    local_dev: "C:/Program Files/Keysight/ADS2026_Update1.2"
+
+  workspace:
+    default_path: "C:/Users/jarvis/ads_projects/net2ads_wrk"
+    note: "Overridden by --workspace CLI argument"
+
+  library:
+    default_name: "net2ads_lib"
+    note: "Overridden by --library CLI argument"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1 — Passive component mapping (R, L, C)
+# ─────────────────────────────────────────────────────────────────────────────
+# All entries below are ADS-confirmed or assumed-by-analogy.
+# CONFIRMED status from: ADS_API_REFERENCE.md Section 11.
+component_map:
+
+  - research_type: R
+    phase: 1
+    description: Ideal resistor
+    ads_lib: ads_rflib
+    ads_cell: R
+    ads_view: symbol
+    api_status: "CONFIRMED"    # de.LCVName('ads_rflib','R','symbol') ✅
+    param_map:
+      - research_param: R
+        ads_param: R
+        unit_passthrough: true    # pass value string as-is (e.g., "50 Ohm")
+    placement:
+      series_angle: 0.0          # horizontal, confirmed from ads_build_spdt_pdk.py
+      shunt_angle: -90.0         # vertical
+    gnd_companion:
+      required: true             # place GND symbol when role=shunt
+      ads_lib: ads_rflib
+      ads_cell: GROUND
+      ads_view: symbol
+      angle: -90.0
+      y_offset: -1.0             # GND placed 1 unit below shunt component
+
+  - research_type: L
+    phase: 1
+    description: Ideal inductor
+    ads_lib: ads_rflib
+    ads_cell: L
+    ads_view: symbol
+    api_status: "UNCONFIRMED"  # assumed by analogy with R — probe on Jarvis before Phase 1 sign-off
+    param_map:
+      - research_param: L
+        ads_param: L
+        unit_passthrough: true
+    placement:
+      series_angle: 0.0
+      shunt_angle: -90.0
+    gnd_companion:
+      required: true
+
+  - research_type: C
+    phase: 1
+    description: Ideal capacitor
+    ads_lib: ads_rflib
+    ads_cell: C
+    ads_view: symbol
+    api_status: "CONFIRMED"    # de.LCVName('ads_rflib','C','symbol') ✅
+    param_map:
+      - research_param: C
+        ads_param: C
+        unit_passthrough: true
+    placement:
+      series_angle: 0.0
+      shunt_angle: -90.0       # confirmed from ads_build_spdt_pdk.py mkC()
+    gnd_companion:
+      required: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2 — Transmission line mapping (TLIN)
+# ─────────────────────────────────────────────────────────────────────────────
+  - research_type: TLIN
+    phase: 2
+    description: Ideal transmission line (electrical length specification)
+    ads_lib: ads_rflib
+    ads_cell: TLIN
+    ads_view: symbol
+    api_status: "UNCONFIRMED"  # TLIN cell name and params need Jarvis probe
+    param_map:
+      - research_param: Z0
+        ads_param: Z
+        unit_passthrough: true
+      - research_param: ELength
+        ads_param: E
+        unit_passthrough: true
+      - research_param: Fref
+        ads_param: F
+        unit_passthrough: true
+    placement:
+      series_angle: 0.0         # horizontal in signal path
+      width_units: 2.0          # TLIN occupies 2 schematic units (wider than R/L/C)
+    pdk_override:
+      enabled: false            # set to true to use a PDK-specific TLine component
+      ads_lib: ~                # e.g., WIN_PP1029_DESIGN_KIT
+      ads_cell: ~               # e.g., PP1029_CPW_TLIN (cell name TBD — needs probe)
+      ads_view: symbol
+      param_map: []             # override param_map when pdk_override.enabled=true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3 — Switch element mapping (SW)
+# ─────────────────────────────────────────────────────────────────────────────
+# SW is an abstract placeholder. Two mapping strategies are supported:
+#   resistive  — ON state as low R, OFF state as small C (default)
+#   pdk_fet    — substitute full PDK FET cell (future, requires pdk_override)
+  - research_type: SW
+    phase: 3
+    description: Abstract switch element
+    mapping_strategy: resistive  # options: resistive | pdk_fet
+    api_status: "CONFIRMED"      # uses R and C which are confirmed
+    state_map:
+      ON:
+        ads_lib: ads_rflib
+        ads_cell: R
+        ads_view: symbol
+        params:
+          R: "0.1 Ohm"           # resistive on-state (series or shunt path)
+      OFF:
+        ads_lib: ads_rflib
+        ads_cell: C
+        ads_view: symbol
+        params:
+          C: "30 fF"             # capacitive off-state (matches Coff_Q3a in spdt_switch.net)
+    pdk_override:
+      enabled: false
+      pdk_config: ~              # e.g., ../pdk-configs/WIN_PP1029_core.yaml
+      ads_cell: WIN_PP1029_CPW
+      note: >
+        When enabled, SW elements are replaced by WIN_PP1029_CPW FET instances.
+        Requires pin geometry from pdk-configs/WIN_PP1029_core.yaml pin_offsets section.
+        Series FET: angle=90, place at (drain_x+0.5, -0.5)
+        Shunt FET:  angle=0,  place at (node_x-0.5,  -0.5)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Port → ADS term mapping
+# ─────────────────────────────────────────────────────────────────────────────
+port_mapping:
+  description: >
+    Research netlist PORT: declarations map to ADS sub-cell terminals.
+    NOT to ADS simulation Term components.
+  ads_api: "design.add_term(net, port_name, TermType.INPUT_OUTPUT)"
+  term_type: INPUT_OUTPUT        # all research ports are bidirectional
+  import_path: "keysight.ads.de._pde.db"  # CONFIRMED import location
+  note: >
+    do not use TermType from keysight.ads.de.db (public module) —
+    TermType and DesignMode are in _pde.db (private submodule).
+    Confirmed: ADS_API_REFERENCE.md §10.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GND symbol
+# ─────────────────────────────────────────────────────────────────────────────
+gnd_symbol:
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  api_status: "CONFIRMED"    # de.LCVName('ads_rflib','GROUND','symbol') ✅
+  angle: -90.0               # confirmed from ads_build_spdt_pdk.py mkGnd()
+  y_offset: -1.0             # placed 1 unit below the shunt component
+  name_pattern: "GND_{component_id}"  # e.g., GND_C1_SH
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Symbol generation settings
+# ─────────────────────────────────────────────────────────────────────────────
+symbol:
+  pin_x: 0.0                 # all symbol pins at x=0 (left edge)
+  pin_y_spacing: 2.0         # 2 units between vertically stacked pins
+  centering: true            # center pin stack vertically around y=0
+  api: "sym_write.add_pin_fig_for_term_type(term.term_type, (x, y))"
+  api_status: "CONFIRMED"    # ✅ confirmed from ads_bias_subcell_create.py
