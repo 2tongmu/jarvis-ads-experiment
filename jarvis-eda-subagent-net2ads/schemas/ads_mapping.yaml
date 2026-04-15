@@ -65,7 +65,7 @@ component_map:
     ads_lib: ads_rflib
     ads_cell: L
     ads_view: symbol
-    api_status: "UNCONFIRMED"  # assumed by analogy with R — probe on Jarvis before Phase 1 sign-off
+    api_status: "CONFIRMED"    # de.LCVName('ads_rflib','L','symbol') ✅ confirmed 2026-04-15 ADS2026_Update1.2
     param_map:
       - research_param: L
         ads_param: L

@@ -215,6 +215,14 @@ placement rules from `schemas/placement.yaml`.
 - First series: x = 2.875 (if preceded by shunt branch) or 4.25 (if not)
 - Spacing: 2.0 units between consecutive series components
 
+**Critical wiring rules (confirmed 2026-04-15 from probe of manually-fixed cells):**
+
+1. **Endpoint-only connection**: ADS connects a component pin to a wire only if a wire ENDPOINT coincides with the pin position. A wire passing THROUGH a pin without ending there leaves that pin floating.
+2. **No single polyline through components**: A wire `[(p1_x, 0), (comp_x, 0), (p2_x, 0)]` will float any pin at `comp_x` that is a midpoint. Use separate segments with endpoints at each pin.
+3. **No explicit shunt wire**: Never draw a wire from shunt.P1 to shunt.P2 — that shorts the component. `place_ground()` draws the wire from shunt.P2 down to the GND symbol; the shunt.P1 connection is made by the signal-path wire endpoint.
+4. **Co-located pins auto-connect**: If a series component's P2 and a port pin are at the same x-coordinate, no wire is needed — ADS connects them implicitly.
+5. **Component body span skipped**: Never draw a wire segment that spans from series.P1 to series.P2 — that shorts the component body.
+
 Placement plan is written to `<name>_placement.yaml` before ADS API calls.
 
 ### 3b. ADS schematic build (confirmed API patterns)
@@ -245,9 +253,12 @@ if cell.view_exists('schematic'):
 sch_view = de.View.create(cell, 'schematic', 'schematic')
 design = sch_view.get_design(DesignMode.WRITE)  # CRITICAL: must be WRITE
 
-# Create port terms (✅ CONFIRMED)
+# Create port terms + visible pin markers (✅ CONFIRMED)
 net  = design.find_or_add_net("port_name")
 term = design.add_term(net, "port_name", TermType.INPUT_OUTPUT)
+dot  = design.add_dot_for_pin((x, y))                      # ✅ CONFIRMED 2026-04-14
+design.add_pin(term, dot, angle=angle, add_annot=True)     # ✅ CONFIRMED 2026-04-14
+# angle=180.0 for left-side port (P1), angle=0.0 for right-side port (P2)
 
 # Place instance (✅ CONFIRMED)
 inst = design.add_instance(
@@ -256,8 +267,10 @@ inst = design.add_instance(
 )
 inst.parameters["R"].value = "50 Ohm"   # ✅ CONFIRMED
 
-# Wire (✅ CONFIRMED)
-design.add_wire([(x1, y1), (x2, y2), ...])
+# Wire — one call = one segment (✅ CONFIRMED)
+# Use separate calls per segment; never span across component pin positions.
+# See wiring rules in Stage 3a above.
+design.add_wire([(x1, y1), (x2, y2)])
 
 # Design variables (✅ CONFIRMED)
 design.cell.write_design_variables([("Rs", "1000 Ohm"), ("Cp", "1 pF")])
@@ -268,22 +281,34 @@ design.save_design()
 
 ### 3c. Symbol generation (confirmed pattern)
 
+Preferred for two-port RF cells: **dual symbol** with left/right pin split.
+Use `ads_api/symbol_ops.py::create_dual_symbol(session, lib, lib_name, cell, cell_name, design, port_angles)`.
+
+Key pattern (all confirmed 2026-04-14):
 ```python
-# Create symbol (✅ CONFIRMED pattern from ads_bias_subcell_create.py)
-if cell.view_exists('symbol'):
-    cell.delete_view('symbol')
+# Symbol-side terms required — schematic terms cannot be used with sym_design.add_pin
+sym_net  = sym_design.find_or_add_net(term_name)
+sym_term = sym_design.add_term(sym_net, term_name, TermType.INPUT_OUTPUT)
+dot      = sym_design.add_dot_for_pin((x, y))
+sym_design.add_pin(sym_term, dot, angle=angle, add_annot=True)
+# Left pins: x=0.0, angle=180; Right pins: x=symbol_width(2.0), angle=0
+
+# Body rectangle on layer 231
+from keysight.ads.de.db_uu import LayerId
+sym_design.add_rectangle(LayerId(231), (bx0, -half_h), (bx1, half_h))
+
+sym_design.save_design()   # ✅ CONFIRMED
+```
+
+Basic single-column symbol (legacy, all pins on left):
+```python
 db.create_symbol((lib_name, cell_name, 'symbol'))
-sym_view = cell.view('symbol')
+sym_view  = cell.view('symbol')
 sym_write = sym_view.get_design(DesignMode.WRITE)
-
-sch_terms = list(design.terms)   # ✅ CONFIRMED
-y_spacing = 2.0
-y_start   = (len(sch_terms) - 1) * y_spacing / 2.0
-for idx, term in enumerate(sch_terms):
-    y_pos = y_start - (idx * y_spacing)
+for idx, term in enumerate(list(design.terms)):
+    y_pos = y_start - (idx * 2.0)
     sym_write.add_pin_fig_for_term_type(term.term_type, (0.0, y_pos))  # ✅ CONFIRMED
-
-sym_write.save_design()   # ✅ CONFIRMED
+sym_write.save_design()
 ```
 
 ---

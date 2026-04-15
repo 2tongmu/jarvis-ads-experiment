@@ -1,0 +1,74 @@
+cell_name: RC_SERIES_SHUNT
+source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\rc_series_shunt\rc_series_shunt_research.net
+generation_timestamp: '2026-04-15T14:43:55'
+ports:
+- name: P1
+  node: P1
+  number: 1
+  x: 1.375
+  y: 0.0
+- name: P2
+  node: P2
+  number: 2
+  x: 5.875
+  y: 0.0
+instances:
+- id: C1_SH
+  ads_lib: ads_rflib
+  ads_cell: C
+  ads_view: symbol
+  x: 3.875
+  y: 0.0
+  angle: -90.0
+  params:
+    C: 2.0 pF
+  role: shunt
+- id: GND_C1_SH
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  x: 3.875
+  y: -1.0
+  angle: -90.0
+  params: {}
+  role: gnd
+- id: R1_SER
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 2.875
+  y: 0.0
+  angle: 0.0
+  params:
+    R: 50 Ohm
+  role: series
+- id: R_TIE
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 4.875
+  y: 0.0
+  angle: 0.0
+  params:
+    R: 0 Ohm
+  role: series
+wires:
+- id: wire_0
+  points:
+  - !!python/tuple
+    - 3.875
+    - 0.0
+  - !!python/tuple
+    - 4.875
+    - 0.0
+  note: 'net ''N_OUT'': (3.875,0.0)->(4.875,0.0)'
+- id: wire_1
+  points:
+  - !!python/tuple
+    - 1.375
+    - 0.0
+  - !!python/tuple
+    - 2.875
+    - 0.0
+  note: 'net ''P1'': (1.375,0.0)->(2.875,0.0)'
+warnings: []

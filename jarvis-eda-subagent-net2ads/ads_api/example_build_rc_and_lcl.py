@@ -56,17 +56,22 @@ if DRY_RUN:
     print("      C1_SH   C=2.0 pF   @ (2.875, 0.0) angle=-90")
     print("      GND     GROUND      @ (2.875,-1.0) angle=-90")
     print("      ports: P1@(1.375,0) P2@(5.25,0)")
-    print("      wire: [(1.375,0),(2.875,0),(4.25,0),(5.25,0)]")
-    print("      wire: [(2.875,0),(2.875,-1.0)]")
+    print("      wire: [(1.375,0),(2.875,0)]  P1 -> C1_SH tap")
+    print("      wire: [(2.875,0),(4.25,0)]   C1_SH tap -> R1_SER.P1")
+    print("      note: R1_SER.P2(5.25) co-locates with P2(5.25) — no wire needed")
+    print("      note: GND wire drawn by place_ground() — no explicit shunt wire")
     print()
     print("  [2] t_network_lcl")
     print("      C1_SH   C=1.2 pF   @ (2.875, 0.0) angle=-90")
     print("      L1_SER  L=3.3 nH   @ (4.25,  0.0) angle=0")
-    print("      L2_SER  L=3.3 nH   @ (6.25,  0.0) angle=0  ⚠️ L unconfirmed")
+    print("      L2_SER  L=3.3 nH   @ (6.25,  0.0) angle=0")
     print("      GND     GROUND      @ (2.875,-1.0) angle=-90")
     print("      ports: P1@(1.375,0) P2@(7.25,0)")
-    print("      wire: [(1.375,0),(2.875,0),(4.25,0),(6.25,0),(7.25,0)]")
-    print("      wire: [(2.875,0),(2.875,-1.0)]")
+    print("      wire: [(1.375,0),(2.875,0)]  P1 -> C1_SH tap")
+    print("      wire: [(2.875,0),(4.25,0)]   C1_SH tap -> L1_SER.P1")
+    print("      wire: [(5.25,0),(6.25,0)]    L1_SER.P2 -> L2_SER.P1")
+    print("      note: L2_SER.P2(7.25) co-locates with P2(7.25) — no wire needed")
+    print("      note: GND wire drawn by place_ground() — no explicit shunt wire")
     sys.exit(0)
 
 # ── ADS session ────────────────────────────────────────────────────────────────
@@ -115,10 +120,13 @@ place_capacitor(session, design_rc, "C1_SH",  value="2.0 pF", x=2.875, y=0.0,  a
 place_ground   (session, design_rc, "GND_C1", x=2.875,        y=-1.0)
 place_resistor (session, design_rc, "R1_SER", value="50 Ohm", x=4.25,  y=0.0,  angle=0.0)
 
-# Main signal path: P1 → C1_SH tap → R1_SER → P2 (all at y=0)
-connect(design_rc, [(1.375, 0.0), (2.875, 0.0), (4.25, 0.0), (5.25, 0.0)])
-# Shunt branch: C1_SH to GND
-connect(design_rc, [(2.875, 0.0), (2.875, -1.0)])
+# Signal path — separate segments (ADS connects pins only at wire ENDPOINTS):
+#   P1_port → C1_SH.P1 tap
+connect(design_rc, [(1.375, 0.0), (2.875, 0.0)])
+#   C1_SH.P1 tap → R1_SER.P1
+connect(design_rc, [(2.875, 0.0), (4.25, 0.0)])
+# R1_SER.P2 (5.25) co-locates with P2 port (5.25) — no wire needed.
+# GND wire from C1_SH.P2 to GND.P1 is drawn by place_ground() — no explicit shunt wire here.
 
 save_design(design_rc)
 create_basic_symbol(session, lib, LIB_NAME, cell_rc, "rc_series_shunt", design_rc)
@@ -143,8 +151,6 @@ print("rc_series_shunt: DONE")
 #   L2_SER:   x=6.25,  y=0  (second series, +2.0 units)
 #   P2:       x=7.25,  y=0
 #
-# ⚠️ L placement uses place_inductor() which calls ads_rflib:L:symbol — UNCONFIRMED.
-#    If this fails on Jarvis, update MEMORY.md OI-02 with the correct LCV name.
 # ══════════════════════════════════════════════════════════════════════════════
 print()
 print("=" * 62)
@@ -159,14 +165,18 @@ place_port(session, design_lcl, "P2", x=7.25,  y=0.0)
 place_capacitor(session, design_lcl, "C1_SH",  value="1.2 pF", x=2.875, y=0.0, angle=-90.0)
 place_ground   (session, design_lcl, "GND_C1", x=2.875,         y=-1.0)
 
-# ⚠️ place_inductor uses UNCONFIRMED LCV — will raise RuntimeError if L cell name is wrong
 place_inductor(session, design_lcl, "L1_SER", value="3.3 nH", x=4.25, y=0.0, angle=0.0)
 place_inductor(session, design_lcl, "L2_SER", value="3.3 nH", x=6.25, y=0.0, angle=0.0)
 
-# Main signal path: P1 → C1_SH tap → L1_SER → L2_SER → P2
-connect(design_lcl, [(1.375, 0.0), (2.875, 0.0), (4.25, 0.0), (6.25, 0.0), (7.25, 0.0)])
-# Shunt branch: C1_SH to GND
-connect(design_lcl, [(2.875, 0.0), (2.875, -1.0)])
+# Signal path — separate segments (ADS connects pins only at wire ENDPOINTS):
+#   P1_port → C1_SH.P1 tap
+connect(design_lcl, [(1.375, 0.0), (2.875, 0.0)])
+#   C1_SH.P1 tap → L1_SER.P1
+connect(design_lcl, [(2.875, 0.0), (4.25, 0.0)])
+#   L1_SER.P2 → L2_SER.P1
+connect(design_lcl, [(5.25, 0.0), (6.25, 0.0)])
+# L2_SER.P2 (7.25) co-locates with P2 port (7.25) — no wire needed.
+# GND wire from C1_SH.P2 to GND.P1 is drawn by place_ground() — no explicit shunt wire here.
 
 save_design(design_lcl)
 create_basic_symbol(session, lib, LIB_NAME, cell_lcl, "t_network_lcl", design_lcl)

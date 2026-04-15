@@ -1,0 +1,74 @@
+cell_name: T_NETWORK_LCL
+source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\t_network_lcl\t_network_lcl_research.net
+generation_timestamp: '2026-04-15T14:44:12'
+ports:
+- name: P1
+  node: P1
+  number: 1
+  x: 1.375
+  y: 0.0
+- name: P2
+  node: P2
+  number: 2
+  x: 5.875
+  y: 0.0
+instances:
+- id: C1_SH
+  ads_lib: ads_rflib
+  ads_cell: C
+  ads_view: symbol
+  x: 3.875
+  y: 0.0
+  angle: -90.0
+  params:
+    C: 1.2 pF
+  role: shunt
+- id: GND_C1_SH
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  x: 3.875
+  y: -1.0
+  angle: -90.0
+  params: {}
+  role: gnd
+- id: L1_SER
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  x: 2.875
+  y: 0.0
+  angle: 0.0
+  params:
+    L: 3.3 nH
+  role: series
+- id: L2_SER
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  x: 4.875
+  y: 0.0
+  angle: 0.0
+  params:
+    L: 3.3 nH
+  role: series
+wires:
+- id: wire_0
+  points:
+  - !!python/tuple
+    - 3.875
+    - 0.0
+  - !!python/tuple
+    - 4.875
+    - 0.0
+  note: 'net ''N_MID'': (3.875,0.0)->(4.875,0.0)'
+- id: wire_1
+  points:
+  - !!python/tuple
+    - 1.375
+    - 0.0
+  - !!python/tuple
+    - 2.875
+    - 0.0
+  note: 'net ''P1'': (1.375,0.0)->(2.875,0.0)'
+warnings: []

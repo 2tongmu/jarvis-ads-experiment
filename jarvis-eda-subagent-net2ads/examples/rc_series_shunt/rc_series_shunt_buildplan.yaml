@@ -1,0 +1,59 @@
+cell_name: RC_SERIES_SHUNT
+source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\rc_series_shunt\rc_series_shunt_research.net
+generation_timestamp: '2026-04-15T14:43:55'
+phase_required: 1
+ports:
+- name: P1
+  node: P1
+  number: 1
+- name: P2
+  node: P2
+  number: 2
+instances:
+- id: R1_SER
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 50 Ohm
+  role: series
+  nodes:
+  - P1
+  - N_OUT
+  phase_required: 1
+  api_status: CONFIRMED
+- id: C1_SH
+  ads_lib: ads_rflib
+  ads_cell: C
+  ads_view: symbol
+  params:
+    C: 2.0 pF
+  role: shunt
+  nodes:
+  - N_OUT
+  - '0'
+  phase_required: 1
+  api_status: CONFIRMED
+- id: GND_C1_SH
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  params: {}
+  role: gnd
+  nodes: []
+  phase_required: 1
+  api_status: CONFIRMED
+- id: R_TIE
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0 Ohm
+  role: series
+  nodes:
+  - N_OUT
+  - P2
+  phase_required: 1
+  api_status: CONFIRMED
+design_variables: []
+warnings: []

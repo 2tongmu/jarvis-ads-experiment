@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Github_folders/Agent_Test/**)",
+      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" verify_phase1.py --dry-run)",
+      "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" verify_phase1.py)",
+      "Bash('C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe' verify_phase1.py)",
+      "Bash(HPEESOF_DIR=\"C:/Program Files/Keysight/ADS2026_Update1.2\" PATH=\"C:/Program Files/Keysight/ADS2026_Update1.2/bin:$PATH\" C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe:*)",
+      "Bash(set HPEESOF_DIR=\"C:\\\\Program Files\\\\Keysight\\\\ADS2026_Update1.2\")",
+      "Bash(\"C:\\\\Program Files\\\\Keysight\\\\ADS2026_Update1.2\\\\tools\\\\python\\\\python.exe\" build_combined_ckt.py)",
+      "Bash(cmd /c run_combined_ckt.bat)",
+      "Bash(cmd:*)",
+      "Bash(HPEESOF_DIR=\"C:/Program Files/Keysight/ADS2026_Update1.2\" PATH=\"/c/Program Files/Keysight/ADS2026_Update1.2/bin:$PATH\" /c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe:*)",
+      "Bash(python -c ':*)",
+      "Bash(python net2ads.py examples/rc_series_shunt/rc_series_shunt_research.net --dry-run)",
+      "Bash(python net2ads.py examples/t_network_lcl/t_network_lcl_research.net --dry-run)"
+    ]
+  }
+}

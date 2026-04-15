@@ -7,7 +7,31 @@
       "Bash(\"C:/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
       "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pytest workspace-scripts/test_bias_inserter.py -v)",
       "Bash(\"C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" -m pip install pytest)",
-      "Bash(grep -E \"\\(^[^/]*de\\\\.py$|__init__\\\\.py|db_uu\\\\.py\\)\")"
+      "Bash(grep -E \"\\(^[^/]*de\\\\.py$|__init__\\\\.py|db_uu\\\\.py\\)\")",
+      "Bash(python3:*)",
+      "Bash(C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe:*)",
+      "Bash(xargs grep:*)",
+      "Bash(sort echo:*)",
+      "Bash(python -c ':*)",
+      "Bash(C:\\\\Program Files\\\\Keysight\\\\ADS2026_Update1.2\\\\tools\\\\python\\\\python.exe:*)",
+      "Bash(export HPEESOF_DIR=\"C:/Program Files/Keysight/ADS2026_Update1.2\")",
+      "Bash(export PATH=\"/c/Program Files/Keysight/ADS2026_Update1.2/bin:$PATH\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/test_net2ads_runner.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_sym_shape.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_sym_shape2.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_sym_shape3.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_sym_layers.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_sym_full.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_schematic_dump.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_schematic_dump2.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_schematic_dump3.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/add_t_network_lcl_v2.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_connectivity_fix.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_connectivity_fix2.py\")",
+      "Bash(\"/c/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe\" \"C:/Github_folders/Agent_Test/probe_connectivity_fix3.py\")",
+      "Bash(\"./tools/python/python.exe\" \"C:\\\\Github_folders\\\\Agent_Test\\\\add_t_network_lcl_v2.py\")",
+      "Bash(PATH=\"C:/Program Files/Keysight/ADS2026_Update1.2/bin:$PATH\" C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe:*)",
+      "Bash(HPEESOF_DIR=\"C:/Program Files/Keysight/ADS2026_Update1.2\" PATH=\"C:/Program Files/Keysight/ADS2026_Update1.2/bin:$PATH\" C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe:*)"
     ]
   }
 }

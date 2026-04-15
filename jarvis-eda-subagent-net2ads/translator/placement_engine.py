@@ -7,14 +7,17 @@ Computes (x, y, angle) for every component in a BuildPlan and writes
 the placement plan to disk. The placement plan is then consumed by the
 ADS Python API calls that build the actual schematic.
 
-Coordinate conventions (confirmed from jarvis-eda-learning reference scripts):
+Coordinate conventions (topology-preserving, netlist-driven):
   - Signal path: y = 0.0, left to right
   - GND level: y = -1.0
-  - Port 1 (left):  x = 1.375  (net_to_ads_cell.py _PORT_LEFT)
-  - First shunt:    x = 2.875  (net_to_ads_cell.py _SHUNT_X[0])
-  - First series:   x = 4.25   (net_to_ads_cell.py _SERIES_X[0])
-  - Component spacing: 2.0 units between consecutive components
-  - Wire waypoints: sorted union of all component x positions + port x positions
+  - Port 1 (left):  x = 1.375  (PORT_LEFT_X)
+  - Series start:   x = 2.875  (FIRST_SHUNT_X — all series start here, no pre-shunt gap)
+  - Component width: 1.0 unit (P1 to P2 of a series component)
+  - Component spacing: 2.0 units between consecutive series origins
+  - Shunt x: backbone_node_x[tap_node] — the P2 x of the upstream series component
+    (the gap between consecutive series components, confirmed topology-correct)
+  - Wire segments: per-net routing — one horizontal segment per net spanning
+    distinct x positions; co-located pins auto-connect (no wire emitted)
 
 Angle conventions (confirmed from ads_build_spdt_pdk.py mkR/mkC/mkGnd):
   R/L/C series:   0.0
@@ -44,19 +47,29 @@ except ImportError:
 from translator.ads_mapper import BuildPlan, BuildInstance, BuildPort
 
 
-# ── Placement constants (confirmed from reference scripts) ─────────────────────
-PORT_LEFT_X   = 1.375   # port 1 wire endpoint x (net_to_ads_cell.py _PORT_LEFT)
-FIRST_SHUNT_X = 2.875   # first shunt component x (net_to_ads_cell.py _SHUNT_X[0])
-FIRST_SERIES_X = 4.25   # first series component x (net_to_ads_cell.py _SERIES_X[0])
-COMPONENT_SPACING = 2.0 # units between consecutive components on signal path
-SIGNAL_Y     = 0.0      # all signal-path components at y=0
-GND_Y        = -1.0     # GND symbols at y=-1
+# ── Placement constants ────────────────────────────────────────────────────────
+PORT_LEFT_X       = 1.375   # port 1 pin x (net_to_ads_cell.py _PORT_LEFT)
+FIRST_SHUNT_X     = 2.875   # first series component x (all series start here)
+COMPONENT_SPACING = 2.0     # units between consecutive series component origins
+SIGNAL_Y          = 0.0     # all signal-path components at y=0
+GND_Y             = -1.0    # GND symbols at y=-1
 
 # Angle conventions (confirmed from ads_build_spdt_pdk.py)
 ANGLE_SERIES  = 0.0
 ANGLE_SHUNT   = -90.0
 ANGLE_GND     = -90.0
 ANGLE_TLINE   = 0.0
+
+# Component width: x-distance from a series component's P1 to its P2 (confirmed bbox).
+COMP_WIDTH    = 1.0
+
+# ── Ground node set (local copy — avoids importing from ir_builder) ────────────
+_GROUND_NODES = frozenset({"0", "gnd", "ground", "vss"})
+
+
+def _is_ground_node(node: str) -> bool:
+    """Return True if the node name represents a ground reference."""
+    return node.strip().lower() in _GROUND_NODES
 
 
 # ── Placed instance ────────────────────────────────────────────────────────────
@@ -114,6 +127,157 @@ def _angle_for(inst: BuildInstance) -> float:
     return ANGLE_SERIES   # series, switch (ON=R), default
 
 
+# ── Backbone ordering ──────────────────────────────────────────────────────────
+
+def _build_backbone_order(build_plan: BuildPlan) -> tuple:
+    """
+    Traverse series/tline/switch components from port1.node to port2.node.
+
+    Returns:
+        ordered_backbone : list of (BuildInstance, entry_node, exit_node)
+                           in signal-flow order from port1 to port2
+        backbone_node_x  : dict mapping each backbone node name -> x position
+                           on the signal path (y=0 plane).
+
+    Uses setdefault so intermediate nodes keep the FIRST (exit-side) x value —
+    this places shunts at the gap between two series components, not at the
+    entry of the next series component.
+
+    Example (t_network_lcl):
+        backbone = [(L1_SER, "P1", "N_MID"), (L2_SER, "N_MID", "P2")]
+        backbone_node_x = {"P1": 1.375, "N_MID": 3.875, "P2": 5.875}
+        -> C1_SH tap "N_MID": placed at x=3.875
+        -> L1_SER at x=2.875, L2_SER at x=4.875
+
+    Example (rc_series_shunt):
+        backbone = [(R1_SER, "P1", "N_OUT"), (R_TIE, "N_OUT", "P2")]
+        backbone_node_x = {"P1": 1.375, "N_OUT": 3.875, "P2": 5.875}
+        -> C1_SH tap "N_OUT": placed at x=3.875
+    """
+    port1_node = next((p.node for p in build_plan.ports if p.number == 1), None)
+    port2_node = next((p.node for p in build_plan.ports if p.number == 2), None)
+
+    series_insts = [
+        i for i in build_plan.instances
+        if i.role in ("series", "tline", "switch")
+    ]
+
+    # Build adjacency dict: node_name -> [(BuildInstance, other_node), ...]
+    # O(n) build; O(1) lookup per step → total walk is O(n).
+    adj: dict = {}
+    for inst in series_insts:
+        if len(inst.nodes) < 2:
+            continue
+        n0, n1 = inst.nodes[0], inst.nodes[1]
+        adj.setdefault(n0, []).append((inst, n1))
+        adj.setdefault(n1, []).append((inst, n0))
+
+    # Greedy walk from port1_node — O(n) total
+    ordered: list = []
+    current_node = port1_node
+    visited_insts: set = set()
+
+    while current_node != port2_node:
+        found = False
+        for inst, next_node in adj.get(current_node, []):
+            if inst.id not in visited_insts:
+                ordered.append((inst, current_node, next_node))
+                visited_insts.add(inst.id)
+                current_node = next_node
+                found = True
+                break
+        if not found:
+            break  # disconnected graph or unsupported topology
+
+    # Compute backbone_node_x: each signal node -> its x on the signal path.
+    # Port1 pin is at PORT_LEFT_X; series components start at FIRST_SHUNT_X.
+    # Use setdefault so that intermediate nodes keep the FIRST (exit-side) x value.
+    backbone_node_x: dict = {port1_node: PORT_LEFT_X}
+    x = FIRST_SHUNT_X
+    for inst, entry, exit_ in ordered:
+        backbone_node_x.setdefault(entry, x)                # series P1 position
+        backbone_node_x.setdefault(exit_, x + COMP_WIDTH)  # series P2 position
+        x += COMPONENT_SPACING
+
+    return ordered, backbone_node_x
+
+
+# ── Per-net wire routing ───────────────────────────────────────────────────────
+
+def _route_wires_from_netlist(
+    build_plan: BuildPlan,
+    placed_instances: list,
+    placed_ports: list,
+    ordered_backbone: list,
+) -> list:
+    """
+    Route one horizontal wire segment per net that connects >= 2 distinct x positions.
+
+    Algorithm:
+      1. Collect all signal-path (y=0) pin x-positions per net from ports and
+         placed instances. Ground-side shunt pins are excluded — vertical wires
+         to GND are drawn by place_ground() in schematic_ops.
+      2. For each net, if max_x > min_x, emit one wire from (min_x, 0) to (max_x, 0).
+
+    Co-located pins on the same net (same x) need no wire — ADS auto-connects them.
+    This produces port-to-series wires, inter-series gap wires, and shunt-tap wires
+    without any hard-coded coordinate assumptions.
+
+    Returns list of PlacedWire.
+    """
+    # Build lookup: backbone direction for each series component
+    backbone_dir = {
+        bi.id: (entry, exit_)
+        for bi, entry, exit_ in ordered_backbone
+    }
+
+    # {node_name: set of x_positions} from ports and placed instances
+    net_xs: dict = {}
+
+    for port in placed_ports:
+        net_xs.setdefault(port.node, set()).add(round(port.x, 6))
+
+    inst_by_id = {pi.id: pi for pi in placed_instances}
+
+    for bi in build_plan.instances:
+        pi = inst_by_id.get(bi.id)
+        if pi is None or bi.role == "gnd":
+            continue
+
+        if bi.role in ("series", "tline", "switch"):
+            entry, exit_ = backbone_dir.get(bi.id, (None, None))
+            if entry is None and len(bi.nodes) >= 2:
+                entry, exit_ = bi.nodes[0], bi.nodes[1]
+            if entry and not _is_ground_node(entry):
+                net_xs.setdefault(entry, set()).add(round(pi.x, 6))
+            if exit_ and not _is_ground_node(exit_):
+                net_xs.setdefault(exit_, set()).add(round(pi.x + COMP_WIDTH, 6))
+
+        elif bi.role == "shunt":
+            # Only P1 (signal node) contributes to signal-path routing.
+            # P2 (ground) is a vertical wire drawn by place_ground() — omit here.
+            tap_node = next(
+                (n for n in bi.nodes if not _is_ground_node(n)), None
+            )
+            if tap_node:
+                net_xs.setdefault(tap_node, set()).add(round(pi.x, 6))
+
+    # Emit one wire segment per net with a non-trivial x span
+    placed_wires = []
+    for wire_idx, (node_name, xs) in enumerate(sorted(net_xs.items())):
+        xs_sorted = sorted(xs)
+        x1, x2 = xs_sorted[0], xs_sorted[-1]
+        if abs(x2 - x1) < 1e-9:
+            continue  # all pins co-located — ADS auto-connects
+        placed_wires.append(PlacedWire(
+            id=f"wire_{wire_idx}",
+            points=[(round(x1, 4), SIGNAL_Y), (round(x2, 4), SIGNAL_Y)],
+            note=f"net '{node_name}': ({x1},{SIGNAL_Y})->({x2},{SIGNAL_Y})",
+        ))
+
+    return placed_wires
+
+
 # ── Coordinate assignment ──────────────────────────────────────────────────────
 
 def _assign_coordinates(
@@ -123,55 +287,83 @@ def _assign_coordinates(
     """
     Assign (x, y) to each BuildInstance and each port.
 
-    Strategy:
-      1. Separate instances into shunts, series/tline, GNDs, and switches.
-      2. Assign shunt x positions starting at FIRST_SHUNT_X, spaced COMPONENT_SPACING apart.
-      3. Assign series/tline x positions starting at FIRST_SERIES_X, spaced COMPONENT_SPACING.
-         If there are no shunts, series starts at FIRST_SHUNT_X instead (no gap needed).
-      4. GND symbols share x with their companion shunt component, placed at GND_Y.
-      5. Compute right port x as last component's x + 1.0.
-      6. Wire waypoints: sorted union of all component x + port x positions.
+    Strategy (topology-preserving, netlist-driven):
+      1. Build backbone order via BFS/greedy walk from port1.node to port2.node.
+         backbone_node_x maps each signal node -> its x on the signal path.
+      2. Series components placed at FIRST_SHUNT_X + i * COMPONENT_SPACING.
+      3. Shunt components placed at backbone_node_x[tap_node] — the exit x
+         of the upstream series component, which is the correct topological
+         tap position (gap between the two adjacent series components).
+      4. GND symbols share x with their companion shunt component, at GND_Y.
+      5. Port2 x = backbone_node_x[port2_node], co-locating with last series P2
+         so no wire is needed for that connection (ADS auto-connects).
+      6. Wires: per-net routing via _route_wires_from_netlist — one horizontal
+         segment per net spanning distinct x positions; no hard-coded features.
 
     Returns (placed_ports, placed_instances, placed_wires).
     """
-    shunts   = [i for i in build_plan.instances if i.role == "shunt"]
-    series   = [i for i in build_plan.instances if i.role in ("series", "tline")]
-    gnds     = [i for i in build_plan.instances if i.role == "gnd"]
-    switches = [i for i in build_plan.instances if i.role == "switch"]
-    # Switches treated same as series for placement purposes
+    shunts     = [i for i in build_plan.instances if i.role == "shunt"]
+    gnds       = [i for i in build_plan.instances if i.role == "gnd"]
+    switches   = [i for i in build_plan.instances if i.role == "switch"]
+    series     = [i for i in build_plan.instances if i.role in ("series", "tline")]
     all_series = series + switches
 
-    # ── Assign shunt x positions ──────────────────────────────────────────────
-    shunt_x_map = {}   # id -> x
-    shunt_xs = []
-    for idx, inst in enumerate(shunts):
-        x = FIRST_SHUNT_X + idx * COMPONENT_SPACING
-        shunt_x_map[inst.id] = x
-        shunt_xs.append(x)
+    # ── Backbone order + signal-path node x-positions ─────────────────────────
+    ordered_backbone, backbone_node_x = _build_backbone_order(build_plan)
 
-    # ── Assign series x positions ─────────────────────────────────────────────
-    series_x_map = {}   # id -> x
-    series_xs = []
-    start_x = FIRST_SERIES_X if shunts else FIRST_SHUNT_X
-    for idx, inst in enumerate(all_series):
-        x = start_x + idx * COMPONENT_SPACING
+    # ── Series x positions from backbone order ─────────────────────────────────
+    series_x_map: dict = {}
+    series_xs: list = []
+    x = FIRST_SHUNT_X
+    for inst, _entry, _exit in ordered_backbone:
         series_x_map[inst.id] = x
         series_xs.append(x)
+        x += COMPONENT_SPACING
 
-    # ── GND companion positions (share x with shunt) ──────────────────────────
+    # Fallback for series components not reached by BFS (should not happen)
+    backbone_ids = {inst.id for inst, _, _ in ordered_backbone}
+    for inst in all_series:
+        if inst.id not in backbone_ids:
+            fallback_x = (max(series_xs) + COMPONENT_SPACING) if series_xs else FIRST_SHUNT_X
+            series_x_map[inst.id] = fallback_x
+            series_xs.append(fallback_x)
+            warnings.append(
+                f"[WARN] Series '{inst.id}' not reached by backbone BFS — "
+                f"using fallback x={fallback_x:.4f}"
+            )
+
+    # ── Shunt x from backbone tap nodes ───────────────────────────────────────
+    shunt_x_map: dict = {}
+    shunt_xs: list = []
+    for inst in shunts:
+        tap_node = next((n for n in inst.nodes if not _is_ground_node(n)), None)
+        if tap_node and tap_node in backbone_node_x:
+            shunt_x = backbone_node_x[tap_node]
+        else:
+            shunt_x = FIRST_SHUNT_X
+            warnings.append(
+                f"[WARN] Shunt '{inst.id}': tap node '{tap_node}' not in backbone. "
+                "Using FIRST_SHUNT_X as fallback."
+            )
+        shunt_x_map[inst.id] = shunt_x
+        shunt_xs.append(shunt_x)
+
+    # ── GND companion positions (share x with companion shunt) ────────────────
     # GND id convention: "GND_{shunt_id}" — match by stripping "GND_" prefix
-    gnd_x_map = {}
+    gnd_x_map: dict = {}
     for gnd in gnds:
         companion_id = gnd.id[4:] if gnd.id.startswith("GND_") else gnd.id
-        x = shunt_x_map.get(companion_id, FIRST_SHUNT_X)
-        gnd_x_map[gnd.id] = x
+        gnd_x_map[gnd.id] = shunt_x_map.get(companion_id, FIRST_SHUNT_X)
 
     # ── Port x positions ──────────────────────────────────────────────────────
     left_x = PORT_LEFT_X
-    all_comp_xs = shunt_xs + series_xs
-    right_x = (max(all_comp_xs) + 1.0) if all_comp_xs else (left_x + 2.0)
+    port2_node = next((p.node for p in build_plan.ports if p.number == 2), None)
+    right_x = backbone_node_x.get(port2_node) if port2_node else None
+    if right_x is None:
+        all_comp_xs = shunt_xs + series_xs
+        right_x = (max(all_comp_xs) + COMP_WIDTH) if all_comp_xs else (left_x + 2.0)
 
-    port_x_map = {}
+    port_x_map: dict = {}
     for port in build_plan.ports:
         if port.number == 1:
             port_x_map[port.name] = left_x
@@ -198,51 +390,30 @@ def _assign_coordinates(
     placed_instances = []
 
     for inst in shunts:
-        x = shunt_x_map[inst.id]
         placed_instances.append(PlacedInstance(
             id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
-            ads_view=inst.ads_view, x=round(x, 4), y=SIGNAL_Y,
+            ads_view=inst.ads_view, x=round(shunt_x_map[inst.id], 4), y=SIGNAL_Y,
             angle=_angle_for(inst), params=inst.params, role=inst.role,
         ))
 
     for gnd in gnds:
-        x = gnd_x_map.get(gnd.id, FIRST_SHUNT_X)
         placed_instances.append(PlacedInstance(
             id=gnd.id, ads_lib=gnd.ads_lib, ads_cell=gnd.ads_cell,
-            ads_view=gnd.ads_view, x=round(x, 4), y=GND_Y,
+            ads_view=gnd.ads_view, x=round(gnd_x_map.get(gnd.id, FIRST_SHUNT_X), 4), y=GND_Y,
             angle=ANGLE_GND, params=gnd.params, role=gnd.role,
         ))
 
     for inst in all_series:
-        x = series_x_map[inst.id]
         placed_instances.append(PlacedInstance(
             id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
-            ads_view=inst.ads_view, x=round(x, 4), y=SIGNAL_Y,
+            ads_view=inst.ads_view, x=round(series_x_map[inst.id], 4), y=SIGNAL_Y,
             angle=_angle_for(inst), params=inst.params, role=inst.role,
         ))
 
-    # ── Wire generation ───────────────────────────────────────────────────────
-    # Main horizontal wire: one polyline through all waypoints at y=0.
-    # Waypoints = sorted union of left_x, right_x, all shunt_xs, all series_xs.
-    waypoint_xs = sorted(set([left_x, right_x] + shunt_xs + series_xs))
-    main_wire = PlacedWire(
-        id="main_wire",
-        points=[(round(x, 4), SIGNAL_Y) for x in waypoint_xs],
-        note="main signal path (horizontal at y=0)",
+    # ── Wire generation (netlist-driven per-net routing) ──────────────────────
+    placed_wires = _route_wires_from_netlist(
+        build_plan, placed_instances, placed_ports, ordered_backbone
     )
-
-    # Shunt vertical wires: one per shunt branch
-    shunt_wires = [
-        PlacedWire(
-            id=f"shunt_wire_{inst.id}",
-            points=[(round(shunt_x_map[inst.id], 4), SIGNAL_Y),
-                    (round(shunt_x_map[inst.id], 4), GND_Y)],
-            note=f"shunt branch: {inst.id} → GND",
-        )
-        for inst in shunts
-    ]
-
-    placed_wires = [main_wire] + shunt_wires
 
     return placed_ports, placed_instances, placed_wires
 

@@ -26,6 +26,8 @@ All confirmed on: ADS 2026 Update 1 (Jarvis machine)
 | API call | Status | Notes |
 |---|---|---|
 | `de.open_workspace(path)` | ✅ CONFIRMED | Suppress vtb.defs warning with `warnings.catch_warnings()` |
+| `de.create_workspace(path)` | ✅ CONFIRMED locally 2026-04-15 | Creates dir + cds.lib + lib.defs; BUT loaded libs are NOT open — must close+reopen or pre-write lib.defs then use open_workspace |
+| `de.create_new_library(name, path)` | ✅ CONFIRMED locally 2026-04-15 | Creates lib dir + .oalib; does NOT write DEFINE to lib.defs — patch lib.defs manually then reopen workspace |
 | `de.get_open_library(name)` | ✅ CONFIRMED | Library must exist in workspace lib.defs |
 | `lib.cell_exists(name)` | ✅ CONFIRMED | |
 | `lib.cell(name)` | ✅ CONFIRMED | |
@@ -49,6 +51,12 @@ All confirmed on: ADS 2026 Update 1 (Jarvis machine)
 | `de.LCVName(lib, cell, view)` | ✅ CONFIRMED | Use for all component references |
 | `TermType.INPUT_OUTPUT` from `_pde.db` | ✅ CONFIRMED | Must import from `_pde.db`, not public `db` |
 | `DesignMode.WRITE` from `_pde.db` | ✅ CONFIRMED | Must import from `_pde.db`, not public `db` |
+| `design.add_dot_for_pin((x, y))` | ✅ CONFIRMED locally 2026-04-14 | Creates visible pin dot on schematic canvas |
+| `design.add_pin(term, dot, angle, add_annot)` | ✅ CONFIRMED locally 2026-04-14 | Links dot to term; angle=180 for left ports, 0 for right |
+| `sym_design.find_or_add_net(name)` | ✅ CONFIRMED locally 2026-04-14 | Symbol design has its own net/term namespace |
+| `sym_design.add_term(net, name, term_type)` | ✅ CONFIRMED locally 2026-04-14 | Must use symbol-side terms (not schematic terms) with sym add_pin |
+| `sym_design.add_dot_for_pin((x, y))` | ✅ CONFIRMED locally 2026-04-14 | Symbol pin dot |
+| `sym_design.add_pin(sym_term, dot, angle, add_annot)` | ✅ CONFIRMED locally 2026-04-14 | term and dot must be from same block (sym_design); angle=180 left, 0 right |
 
 ### Confirmed LCVNames (ads_rflib)
 
@@ -57,7 +65,7 @@ All confirmed on: ADS 2026 Update 1 (Jarvis machine)
 | Resistor | `de.LCVName('ads_rflib','R','symbol')` | ✅ CONFIRMED |
 | Capacitor | `de.LCVName('ads_rflib','C','symbol')` | ✅ CONFIRMED |
 | Ground | `de.LCVName('ads_rflib','GROUND','symbol')` | ✅ CONFIRMED |
-| Inductor | `de.LCVName('ads_rflib','L','symbol')` | ⚠️ UNCONFIRMED — assumed by analogy |
+| Inductor | `de.LCVName('ads_rflib','L','symbol')` | ✅ CONFIRMED — local test 2026-04-14/15, ADS2026_Update1.2; L param key = "L", place_inductor works |
 | TLIN | `de.LCVName('ads_rflib','TLIN','symbol')` | ⚠️ UNCONFIRMED — Phase 2 item |
 
 ### Confirmed placement angles
@@ -88,9 +96,9 @@ relying on it in production builds.
 
 | API call | Risk | Fallback | Investigation status |
 |---|---|---|---|
-| `de.LCVName('ads_rflib','L','symbol')` | Inductor LCV may differ | Log error; skip | Not yet run on Jarvis |
+| `de.LCVName('ads_rflib','L','symbol')` | ~~Inductor LCV may differ~~ | — | CONFIRMED 2026-04-15 locally on ADS2026_Update1.2 via verify_phase1.py full pipeline run |
 | `de.LCVName('ads_rflib','TLIN','symbol')` | TLIN cell name TBD | Phase 2 probe needed | Phase 2 work item |
-| `design.add_dot_for_pin(location)` | Pin graphic — unconfirmed path | Use `add_pin_fig_for_term_type` on symbol | §12 of ADS_API_REFERENCE.md |
+| `design.add_dot_for_pin(location)` | ~~Pin graphic unconfirmed~~ | — | RESOLVED 2026-04-14 — confirmed on both schematic and symbol designs |
 
 ---
 
@@ -98,8 +106,8 @@ relying on it in production builds.
 
 | ID | Description | Severity | Owner |
 |---|---|---|---|
-| OI-01 | Pin graphic not visible on schematic canvas — `add_term()` creates no graphic | Medium | Deferred: use symbol view instead |
-| OI-02 | Inductor (L) LCV name `ads_rflib:L:symbol` unconfirmed — needs Jarvis probe run | High (Phase 1 blocker) | Agent — must probe before Phase 1 sign-off |
+| OI-01 | ~~Pin graphic not visible on schematic canvas~~ | ~~Medium~~ | RESOLVED 2026-04-14 — use `add_dot_for_pin((x,y))` + `add_pin(term, dot, angle)` after `add_term()`; confirmed locally on ADS2026_Update1.2 |
+| OI-02 | ~~Inductor (L) LCV name unconfirmed~~ | ~~High (Phase 1 blocker)~~ | RESOLVED 2026-04-15 — `ads_rflib:L:symbol` + `L` param key confirmed via full pipeline run (verify_phase1.py); reconfirm on Jarvis (Update1) before final sign-off |
 | OI-03 | TLIN ADS cell name and parameter names unconfirmed | High (Phase 2 blocker) | Agent — Phase 2 start |
 | OI-04 | SW element mapping for SPDT is resistive/capacitive placeholder only | Low (Phase 3 known) | Human — PDK FET substitution is future work |
 | OI-05 | `ads_schematic_ports_ic:iopin` not confirmed as usable for schematic pin graphics | Low | Deferred — investigate in Phase 1 |
@@ -116,13 +124,25 @@ relying on it in production builds.
 | R series angle = 0.0 | Confirmed from `ads_build_spdt_pdk.py` mkR() | 2026-04-13 |
 | C shunt angle = −90.0 | Confirmed from `ads_build_spdt_pdk.py` mkC() | 2026-04-13 |
 | GND angle = −90.0 | Confirmed from `ads_build_spdt_pdk.py` mkGnd() | 2026-04-13 |
-| L series angle = 0.0 | Assumed same as R — not yet Jarvis-confirmed | 2026-04-13 |
-| L series LCV = ads_rflib:L:symbol | Assumed by analogy with R/C — needs probe | 2026-04-13 |
+| L series angle = 0.0 | Confirmed locally 2026-04-12 — horizontal, same as R | 2026-04-12 |
+| L series LCV = ads_rflib:L:symbol | Confirmed locally 2026-04-12 on ADS2026_Update1.2 | 2026-04-12 |
 | TLIN → ads_rflib:TLIN by default | Configurable override in ads_mapping.yaml | 2026-04-13 |
 | SW ON → R(0.1 Ohm) | Minimal resistive model for Phase 3 topology fidelity | 2026-04-13 |
 | SW OFF → C(30 fF) | Matches Coff_Q3a value from spdt_switch.net shunt stub | 2026-04-13 |
 | Port terms use TermType.INPUT_OUTPUT | All ports are bidirectional RF ports | 2026-04-13 |
+| Series component wiring: P1=origin, P2=origin+(1,0) for angle=0 | Confirmed from ads_build_spdt_pdk.py pin comments; wires must use separate segments, not one continuous wire through series components | 2026-04-14 |
+| Shunt component wiring: NO explicit shunt wire from P1→P2 | A wire from P1 to P2 SHORTS the component. Only GND wire (from place_ground, P2→GND) needed. P1 connects via main-path wire endpoint; P2 connects via GND wire start endpoint. | 2026-04-15 |
+| Series component wiring: separate segment P2→next_P1, never P1→P2 | A wire spanning a component P1→P2 SHORTS it. Correct: wire from prev_feature to component.P1, then from component.P2 to next_feature. Component body (P1..P2) has no wire. | 2026-04-15 |
+| Wire endpoints auto-connect to pins — midpoints do NOT | ADS connects a component pin only if a wire ENDPOINT coincides. A wire passing THROUGH a pin without an endpoint there leaves that pin floating. | 2026-04-15 |
+| Co-located component pins (or pin + port) auto-connect without a wire | e.g. last series.P2 and port P2 at same x — no wire segment needed | 2026-04-15 |
+| Left-side port angle=180, right-side port angle=0 | Makes pin point outward from circuit boundary; confirmed visually 2026-04-14 | 2026-04-14 |
 | Symbol pins at x=0, spaced 2.0 units vertically | Matches `ads_bias_subcell_create.py` confirmed pattern | 2026-04-13 |
+| Dual symbol: symbol-side terms required for add_pin | Schematic terms cannot be used with sym_design.add_pin — "must be in the same block" error; must create parallel terms via sym_design.find_or_add_net + sym_design.add_term | 2026-04-14 |
+| Dual symbol: left pins at x=0 angle=180, right pins at x=symbol_width angle=0 | Confirmed visually and via successful run 2026-04-14; body rectangle via add_wire polyline | 2026-04-14 |
+
+| Workspace creation pattern | Do NOT rely on de.create_workspace() to open ads_rflib — must pre-write lib.defs (INCLUDE analog_rf.defs + DEFINE lib) then call open_workspace() | 2026-04-15 |
+| GND placement offset | place_ground(x, y) takes y=C.P2 position (y=-1.0 for shunt at y=0 angle=-90); places GND symbol at y-1.0=-2.0; draws explicit wire from y to y-1.0 — 3-level shunt chain: signal(0) → C.P2(-1) → GND(-2) | 2026-04-15 |
+| lib.defs template for new workspaces | `INCLUDE $HPEESOF_DIR/oalibs/analog_rf.defs` + `DEFINE <lib> <lib>` + `ASSIGN <lib> libMode shared` — cds.lib = `softinclude lib.defs` | 2026-04-15 |
 
 ---
 
