@@ -38,7 +38,7 @@ Usage:
 """
 
 from ads_api.ads_session import ADSSession
-from ads_api.cell_ops import open_or_create_symbol, save_design
+from ads_api.cell_ops import open_or_create_symbol, save_design, commit_design
 
 
 # ── Layer constants (confirmed 2026-04-14 on ADS2026_Update1.2) ───────────────
@@ -117,6 +117,8 @@ def create_basic_symbol(
         print(f"[symbol] pin '{term.name}' at (0.0, {y_pos})")
 
     # ── Save symbol ───────────────────────────────────────────────────────────
+    # Commit transaction to finalize symbol design in OpenAccess (same pattern as schematic)
+    commit_design(session, sym_design)
     save_design(sym_design)
     print(f"[symbol] saved: {lib_name}:{cell_name}:symbol")
 
@@ -328,5 +330,7 @@ def create_dual_symbol(
         print(f"[symbol] right pin '{term.name}' at ({symbol_width}, {y}) angle=0")
 
     # ── Save ──────────────────────────────────────────────────────────────────
+    # Commit transaction to finalize symbol design in OpenAccess (same pattern as schematic)
+    commit_design(session, sym_design)
     save_design(sym_design)
     print(f"[symbol] dual symbol saved: {lib_name}:{cell_name}:symbol")

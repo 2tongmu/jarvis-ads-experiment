@@ -261,7 +261,7 @@ def main():
 
     from ads_api.ads_session   import get_ads_session
     from ads_api.workspace_ops import open_workspace
-    from ads_api.cell_ops      import open_or_create_schematic, save_design
+    from ads_api.cell_ops      import open_or_create_schematic, save_design, commit_design
     from ads_api.schematic_ops import place_port, place_instance, connect
     from ads_api.symbol_ops    import create_dual_symbol
 
@@ -293,6 +293,11 @@ def main():
         for wire in placement.wires:
             connect(design, wire.points)
 
+        # CRITICAL FIX: Commit transaction to finalize all instances in OpenAccess.
+        # Without this, instances are not registered in the database and will be
+        # invisible to the ADS netlister (causing open-circuit simulation).
+        # See ads_build_spdt_pdk.py for confirmed pattern.
+        commit_design(session, design)
         save_design(design)
         print(f"  [schematic] {lib_name}:{cell_name}:schematic  saved")
 

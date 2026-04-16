@@ -65,7 +65,7 @@ All confirmed on: ADS 2026 Update 1 (Jarvis machine)
 | Resistor | `de.LCVName('ads_rflib','R','symbol')` | ✅ CONFIRMED |
 | Capacitor | `de.LCVName('ads_rflib','C','symbol')` | ✅ CONFIRMED |
 | Ground | `de.LCVName('ads_rflib','GROUND','symbol')` | ✅ CONFIRMED |
-| Inductor | `de.LCVName('ads_rflib','L','symbol')` | ✅ CONFIRMED — local test 2026-04-14/15, ADS2026_Update1.2; L param key = "L", place_inductor works |
+| Inductor | `de.LCVName('ads_rflib','L','symbol')` | ✅ CONFIRMED — local test 2026-04-14/15, ADS 2026 Update 1; L param key = "L", place_inductor works |
 | TLIN | `de.LCVName('ads_rflib','TLIN','symbol')` | ⚠️ UNCONFIRMED — Phase 2 item |
 
 ### Confirmed placement angles
@@ -96,7 +96,7 @@ relying on it in production builds.
 
 | API call | Risk | Fallback | Investigation status |
 |---|---|---|---|
-| `de.LCVName('ads_rflib','L','symbol')` | ~~Inductor LCV may differ~~ | — | CONFIRMED 2026-04-15 locally on ADS2026_Update1.2 via verify_phase1.py full pipeline run |
+| `de.LCVName('ads_rflib','L','symbol')` | ~~Inductor LCV may differ~~ | — | CONFIRMED 2026-04-15 locally on ADS 2026 Update 1 via verify_phase1.py full pipeline run |
 | `de.LCVName('ads_rflib','TLIN','symbol')` | TLIN cell name TBD | Phase 2 probe needed | Phase 2 work item |
 | `design.add_dot_for_pin(location)` | ~~Pin graphic unconfirmed~~ | — | RESOLVED 2026-04-14 — confirmed on both schematic and symbol designs |
 
@@ -106,7 +106,7 @@ relying on it in production builds.
 
 | ID | Description | Severity | Owner |
 |---|---|---|---|
-| OI-01 | ~~Pin graphic not visible on schematic canvas~~ | ~~Medium~~ | RESOLVED 2026-04-14 — use `add_dot_for_pin((x,y))` + `add_pin(term, dot, angle)` after `add_term()`; confirmed locally on ADS2026_Update1.2 |
+| OI-01 | ~~Pin graphic not visible on schematic canvas~~ | ~~Medium~~ | RESOLVED 2026-04-14 — use `add_dot_for_pin((x,y))` + `add_pin(term, dot, angle)` after `add_term()`; confirmed locally on ADS 2026 Update 1 |
 | OI-02 | ~~Inductor (L) LCV name unconfirmed~~ | ~~High (Phase 1 blocker)~~ | RESOLVED 2026-04-15 — `ads_rflib:L:symbol` + `L` param key confirmed via full pipeline run (verify_phase1.py); reconfirm on Jarvis (Update1) before final sign-off |
 | OI-03 | TLIN ADS cell name and parameter names unconfirmed | High (Phase 2 blocker) | Agent — Phase 2 start |
 | OI-04 | SW element mapping for SPDT is resistive/capacitive placeholder only | Low (Phase 3 known) | Human — PDK FET substitution is future work |
@@ -125,7 +125,7 @@ relying on it in production builds.
 | C shunt angle = −90.0 | Confirmed from `ads_build_spdt_pdk.py` mkC() | 2026-04-13 |
 | GND angle = −90.0 | Confirmed from `ads_build_spdt_pdk.py` mkGnd() | 2026-04-13 |
 | L series angle = 0.0 | Confirmed locally 2026-04-12 — horizontal, same as R | 2026-04-12 |
-| L series LCV = ads_rflib:L:symbol | Confirmed locally 2026-04-12 on ADS2026_Update1.2 | 2026-04-12 |
+| L series LCV = ads_rflib:L:symbol | Confirmed locally 2026-04-12 on ADS 2026 Update 1 | 2026-04-12 |
 | TLIN → ads_rflib:TLIN by default | Configurable override in ads_mapping.yaml | 2026-04-13 |
 | SW ON → R(0.1 Ohm) | Minimal resistive model for Phase 3 topology fidelity | 2026-04-13 |
 | SW OFF → C(30 fF) | Matches Coff_Q3a value from spdt_switch.net shunt stub | 2026-04-13 |

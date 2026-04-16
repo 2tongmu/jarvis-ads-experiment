@@ -149,3 +149,31 @@ def save_design(design) -> None:
     """
     design.save_design()   # ✅ CONFIRMED
     print("[save] design saved")
+
+
+def commit_design(session: ADSSession, design) -> None:
+    """
+    Commit a design transaction to finalize all changes in OpenAccess.
+
+    CRITICAL FIX for metadata registration bug:
+    When instances are created via add_instance(), they exist in memory but
+    must be finalized via Transaction.commit() to be registered in the
+    OpenAccess database. Without this, instances are invisible to the
+    ADS netlister and cause "no instances" or open-circuit behavior.
+
+    Pattern (confirmed from ads_build_spdt_pdk.py):
+        tx = de.db.Transaction(design, "operation_name")
+        # ... add instances, wires, ports, etc ...
+        tx.commit()
+        design.save_design()
+
+    Args:
+        session : ADSSession
+        design  : schematic design object (WRITE mode)
+
+    API status:
+        de.db.Transaction(design, label)   ✅ CONFIRMED from ads_build_spdt_pdk.py
+        transaction.commit()                ✅ CONFIRMED
+    """
+    session.db.Transaction(design, "net2ads_build").commit()
+    print("[commit] design transaction committed (OpenAccess metadata finalized)")
