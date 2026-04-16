@@ -42,7 +42,8 @@ All confirmed on: ADS 2026 Update 1 (Jarvis machine)
 | `inst.parameters[key].value = expr` | ✅ CONFIRMED | String with unit suffix preferred |
 | `design.add_wire([(x1,y1),(x2,y2),...])` | ✅ CONFIRMED | One call = one polyline |
 | `design.cell.write_design_variables([...])` | ✅ CONFIRMED | |
-| `design.save_design()` | ✅ CONFIRMED | Must call — not auto-saved |
+| `de.db.Transaction(design, label).commit()` | ✅ CONFIRMED 2026-04-15 | **CRITICAL:** Must call before save_design() to finalize OpenAccess metadata. Without this, instances are invisible to netlister (open-circuit bug). Confirmed from ads_build_spdt_pdk.py pattern. |
+| `design.save_design()` | ✅ CONFIRMED | Must call — not auto-saved. Always call Transaction.commit() first. |
 | `db.create_symbol((lib, cell, 'symbol'))` | ✅ CONFIRMED | |
 | `cell.view('symbol')` | ✅ CONFIRMED | |
 | `sym_write.add_pin_fig_for_term_type(term_type, (x,y))` | ✅ CONFIRMED | Symbol only — not schematic |
@@ -143,6 +144,7 @@ relying on it in production builds.
 | Workspace creation pattern | Do NOT rely on de.create_workspace() to open ads_rflib — must pre-write lib.defs (INCLUDE analog_rf.defs + DEFINE lib) then call open_workspace() | 2026-04-15 |
 | GND placement offset | place_ground(x, y) takes y=C.P2 position (y=-1.0 for shunt at y=0 angle=-90); places GND symbol at y-1.0=-2.0; draws explicit wire from y to y-1.0 — 3-level shunt chain: signal(0) → C.P2(-1) → GND(-2) | 2026-04-15 |
 | lib.defs template for new workspaces | `INCLUDE $HPEESOF_DIR/oalibs/analog_rf.defs` + `DEFINE <lib> <lib>` + `ASSIGN <lib> libMode shared` — cds.lib = `softinclude lib.defs` | 2026-04-15 |
+| **CRITICAL: Transaction.commit() before save_design()** | Must wrap all placement operations (add_instance, add_wire, add_term, add_pin) in `de.db.Transaction(design, label).commit()` before calling `design.save_design()`. Without this, instances are not registered in OpenAccess metadata and become invisible to the netlister — causing open-circuit simulation. Confirmed from ads_build_spdt_pdk.py pattern and fixed rc_series_shunt 2026-04-15. Applied to schematic, basic symbol, and dual symbol. | 2026-04-15 |
 
 ---
 
