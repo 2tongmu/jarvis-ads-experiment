@@ -1,0 +1,1329 @@
+# WIN_PP15_6X_DESIGN_KIT_core.yaml
+# PDK configuration — component map + pin offsets (load every session)
+#
+# Source: build_pdk_yaml.py (live ADS probe)
+# Generated: 2026-04-16
+
+# ── PDK identity ─────────────────────────────────────────────────────────────
+
+pdk_name: WIN_PP15_6X_DESIGN_KIT
+pdk_lib_name: WIN_PP15_6X_DESIGN_KIT
+pdk_lib_path: "C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\ads_pdk\WIN_PP15_6X_DESIGN_KIT"
+pdk_lib_defs: "C:/Github_folders/jarvis-ads-experiment/jarvis-eda-subagent-net2ads/ads_pdk/WIN_PP15_6X_DESIGN_KIT/lib.defs"
+
+# ── Workspace setup ───────────────────────────────────────────────────────────
+# Pre-write lib.defs with INCLUDE <pdk_lib_defs> BEFORE calling open_workspace().
+# Do NOT use de.create_workspace() as it does not load PDK libraries.
+
+workspace_setup:
+  method: lib_defs_include
+  sequence:
+    - step: write_cds_lib         # cds.lib = 'softinclude lib.defs'
+    - step: write_lib_defs        # INCLUDE rflib + INCLUDE pdk_lib_defs + DEFINE user_lib
+    - step: open_workspace        # de.open_workspace(ws_dir) — loads all libs
+  known_warnings:
+    - "Syntax error in library definition file vtb.defs — benign, suppress with warnings.catch_warnings()"
+
+# ── Component map ────────────────────────────────────────────────────────────
+# Maps PDK cells to their circuit role. Used by the net2ads pipeline to select
+# which PDK cell to place for a given component type in the netlist.
+#
+# TRANSISTOR TERMINAL RULE (applied automatically by build_pdk_yaml.py):
+#   3-terminal transistor → TRANSISTOR_SWITCH  (all pins accessible, usable as switch)
+#   2-terminal transistor → TRANSISTOR_AMPLIFIER (source/emitter pre-grounded, NOT a switch)
+
+component_map:
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_CPW
+    ads_view: symbol
+    netlist_model: PP1561_CPW
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_CPW_OIP3_2X75
+    ads_view: symbol
+    netlist_model: PP1561_CPW_OIP3_2X75
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_CPW_OIP3_4X75
+    ads_view: symbol
+    netlist_model: dcp
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params:
+      NOF: 2
+      Ugw: 75.0 um
+      Temp: 25
+      ExtP1: NO
+      ExtP2: NO
+      W: 150
+      L: 0.15
+      ExportName: dcp
+      Status: Data_verification
+      NOISE: 1
+      Note: "Bell-shaped prediction is not included in model"
+      Minimun UGW: " 10 um when MET2T is 4 um"
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_SW_LS_S
+    ads_view: symbol
+    netlist_model: PP1561_SW_LS_S
+    pin_count: 3
+    pin_names: [SOURCE, DRAIN, GATE]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_CPW_PORT1D
+    ads_view: symbol
+    netlist_model: SYM_CPW_PORT1D
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_CPW_PORT1G
+    ads_view: symbol
+    netlist_model: SYM_CPW_PORT1G
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_CPW_PORT1S
+    ads_view: symbol
+    netlist_model: SYM_CPW_PORT1S
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_HBT_3PORT
+    ads_view: symbol
+    netlist_model: SYM_HBT_3PORT
+    pin_count: 3
+    pin_names: [C, B, E]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_CPW
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_CPW
+    pin_count: 4
+    pin_names: [P1, P2, P3, P4]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_CPW_3PORT
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_CPW_3PORT
+    pin_count: 3
+    pin_names: [P1, P2, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_CPW_SS
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_CPW_SS
+    pin_count: 4
+    pin_names: [P1, P2, P3, P4]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_LS_Switch1
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_LS_Switch1
+    pin_count: 3
+    pin_names: [SOURCE, DRAIN, GATE]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_SW_Common
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_SW_Common
+    pin_count: 3
+    pin_names: [source, drain, P3]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: WIN_lib_WIN_PHEMT1_6_3_G2_schematic
+    ads_view: symbol
+    netlist_model: WIN_lib_WIN_PHEMT1_6_3_G2_schematic
+    pin_count: 3
+    pin_names: [drain, P2, source]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: WIN_lib_WIN_PHEMT_1_7_1_schematic
+    ads_view: symbol
+    netlist_model: WIN_lib_WIN_PHEMT_1_7_1_schematic
+    pin_count: 3
+    pin_names: [drain, P2, source]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: TRANSISTOR_SWITCH
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: WIN_lib_WIN_PHEMT_1_7_2_schematic
+    ads_view: symbol
+    netlist_model: WIN_lib_WIN_PHEMT_1_7_2_schematic
+    pin_count: 3
+    pin_names: [drain, P2, source]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: RESISTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156XMSR
+    ads_view: symbol
+    netlist_model: PP156XMSR
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: RESISTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_TFR
+    ads_view: symbol
+    netlist_model: PP156X_TFR
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: RESISTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_TFR_Slim
+    ads_view: symbol
+    netlist_model: PP156X_TFR_Slim
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: RESISTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_TFR
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_TFR
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: CAPACITOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156XCAPA
+    ads_view: symbol
+    netlist_model: PP156XCAPA
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: CAPACITOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156XCAPA_Custom
+    ads_view: symbol
+    netlist_model: PP156XCAPA_Custom
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: CAPACITOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_MIM
+    ads_view: symbol
+    netlist_model: SYM_MIM
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: CAPACITOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_CAP_AIR
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_CAP_AIR
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: INDUCTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156XINDRA
+    ads_view: symbol
+    netlist_model: PP156XINDRA
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: INDUCTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156XINDSA
+    ads_view: symbol
+    netlist_model: PP156XINDSA
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: INDUCTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_IND_ROUND_EM
+    ads_view: symbol
+    netlist_model: PP156X_IND_ROUND_EM
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: INDUCTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_RInd
+    ads_view: symbol
+    netlist_model: SYM_RInd
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: INDUCTOR
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_SInd
+    ads_view: symbol
+    netlist_model: SYM_SInd
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_DIODE
+    ads_view: symbol
+    netlist_model: PP1561_DIODE
+    pin_count: 2
+    pin_names: [a1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_FGDIODE
+    ads_view: symbol
+    netlist_model: PP1561_FGDIODE
+    pin_count: 2
+    pin_names: [a1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP1561_MS
+    ads_view: symbol
+    netlist_model: PP1561_MS
+    pin_count: 2
+    pin_names: [drain, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_Bump
+    ads_view: symbol
+    netlist_model: PP156X_Bump
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_COV
+    ads_view: symbol
+    netlist_model: PP156X_COV
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_SL2_EM
+    ads_view: symbol
+    netlist_model: PP156X_SL2_EM
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: PP156X_bv2t
+    ads_view: symbol
+    netlist_model: PP156X_bv2t
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_DIODE
+    ads_view: symbol
+    netlist_model: SYM_DIODE
+    pin_count: 2
+    pin_names: [a1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_EGcontact
+    ads_view: symbol
+    netlist_model: SYM_EGcontact
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_COV
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_COV
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_DIODE
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_DIODE
+    pin_count: 2
+    pin_names: [a1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_MS
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_MS
+    pin_count: 2
+    pin_names: [drain, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_PP15_6X_MS_SS
+    ads_view: symbol
+    netlist_model: SYM_PP15_6X_MS_SS
+    pin_count: 2
+    pin_names: [drain, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_SCON
+    ads_view: symbol
+    netlist_model: SYM_SCON
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+  - rfscikit_type: PASSIVE_PDK
+    ads_lib: WIN_PP15_6X_DESIGN_KIT
+    ads_cell: SYM_STACK
+    ads_view: symbol
+    netlist_model: SYM_STACK
+    pin_count: 2
+    pin_names: [P1, P2]
+    default_params: {}  # requires live probe
+
+# ── Ideal passives (no PDK swap needed) ───────────────────────────────────────
+# Use ads_rflib components for ideal R/L/C in schematic (Phase 1 passives).
+
+ideal_passives:
+  - type: R
+    ads_lib: ads_rflib
+    ads_cell: R
+  - type: L
+    ads_lib: ads_rflib
+    ads_cell: L
+  - type: C
+    ads_lib: ads_rflib
+    ads_cell: C
+
+# ── Pin offsets ───────────────────────────────────────────────────────────────
+# Snap_point positions for each terminal at 0/90/180/270 degrees.
+# Source: build_pdk_yaml.py — live ADS probe (InstPin.snap_point)
+# All offsets are RELATIVE to instance placement origin.
+# ⚠ InstTerm.position does NOT exist in ADS 2026 — use InstPin.snap_point
+
+pin_offsets:
+  PP1561_CPW:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: -0.5}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: +0.5}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: +0.5}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: -0.5}
+  PP1561_CPW_OIP3_2X75:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: -0.5}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: +0.5}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: +0.5}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: -0.5}
+  PP1561_CPW_OIP3_4X75:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: -0.5}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: +0.5}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: +0.5}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: -0.5}
+  PP1561_DIODE:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['a1', 'P2']
+    angles:
+      0:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP1561_FGDIODE:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['a1', 'P2']
+    angles:
+      0:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP1561_MS:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['drain', 'P2']
+    angles:
+      0:
+        pin1_drain: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: +0.5}
+      90:
+        pin1_drain: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: +0.5}
+      180:
+        pin1_drain: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: -0.5}
+      270:
+        pin1_drain: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: -0.5}
+  PP1561_SW_LS_S:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['SOURCE', 'DRAIN', 'GATE']
+    angles:
+      0:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x: +1, y:  0.0}
+        pin3_GATE: {x: +0.5, y: -0.5}
+      90:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x:  0.0, y: +1}
+        pin3_GATE: {x: +0.5, y: +0.5}
+      180:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x: -1, y:  0.0}
+        pin3_GATE: {x: -0.5, y: +0.5}
+      270:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x:  0.0, y: -1}
+        pin3_GATE: {x: -0.5, y: -0.5}
+  PP156XCAPA:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156XCAPA_Custom:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156XINDRA:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156XINDSA:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156XMSR:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156X_Bump:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -0.5}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +0.5}
+  PP156X_COV:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x: +0.00625, y:  0.0}
+        pin2_P2: {x: +1.006, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y: +0.00625}
+        pin2_P2: {x:  0.0, y: +1.006}
+      180:
+        pin1_P1: {x: -0.00625, y:  0.0}
+        pin2_P2: {x: -1.006, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y: -0.00625}
+        pin2_P2: {x:  0.0, y: -1.006}
+  PP156X_IND_ROUND_EM:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156X_SL2_EM:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156X_TFR:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156X_TFR_Slim:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  PP156X_bv2t:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_CPW_PORT1D:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: -0.5}
+      90:
+        pin1_P1: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: +0.5}
+      180:
+        pin1_P1: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: +0.5}
+      270:
+        pin1_P1: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: -0.5}
+  SYM_CPW_PORT1G:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: -0.5}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: +0.5}
+        pin3_P3: {x: +0.5, y: +0.5}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: +0.5}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +0.5, y: -0.5}
+        pin3_P3: {x: -0.5, y: -0.5}
+  SYM_CPW_PORT1S:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x: +0.5, y: -0.5}
+        pin2_P2: {x: +0.5, y: +0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+      90:
+        pin1_P1: {x: +0.5, y: +0.5}
+        pin2_P2: {x: -0.5, y: +0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+      180:
+        pin1_P1: {x: -0.5, y: +0.5}
+        pin2_P2: {x: -0.5, y: -0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+      270:
+        pin1_P1: {x: -0.5, y: -0.5}
+        pin2_P2: {x: +0.5, y: -0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+  SYM_DIODE:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['a1', 'P2']
+    angles:
+      0:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_EGcontact:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_HBT_3PORT:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['C', 'B', 'E']
+    angles:
+      0:
+        pin1_C: {x: +0.5, y: +0.5}
+        pin2_B: {x:  0.0, y:  0.0}
+        pin3_E: {x: +0.5, y: -0.5}
+      90:
+        pin1_C: {x: -0.5, y: +0.5}
+        pin2_B: {x:  0.0, y:  0.0}
+        pin3_E: {x: +0.5, y: +0.5}
+      180:
+        pin1_C: {x: -0.5, y: -0.5}
+        pin2_B: {x:  0.0, y:  0.0}
+        pin3_E: {x: -0.5, y: +0.5}
+      270:
+        pin1_C: {x: +0.5, y: -0.5}
+        pin2_B: {x:  0.0, y:  0.0}
+        pin3_E: {x: -0.5, y: -0.5}
+  SYM_MIM:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_PP15_6X_CAP_AIR:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_PP15_6X_COV:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x: +0.00625, y:  0.0}
+        pin2_P2: {x: +1.006, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y: +0.00625}
+        pin2_P2: {x:  0.0, y: +1.006}
+      180:
+        pin1_P1: {x: -0.00625, y:  0.0}
+        pin2_P2: {x: -1.006, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y: -0.00625}
+        pin2_P2: {x:  0.0, y: -1.006}
+  SYM_PP15_6X_CPW:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3', 'P4']
+    angles:
+      0:
+        pin1_P1: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: -0.5}
+        pin4_P4: {x: +0.75, y: -0.5}
+      90:
+        pin1_P1: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: +0.5}
+        pin4_P4: {x: +0.5, y: +0.75}
+      180:
+        pin1_P1: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: +0.5}
+        pin4_P4: {x: -0.75, y: +0.5}
+      270:
+        pin1_P1: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: -0.5}
+        pin4_P4: {x: -0.5, y: -0.75}
+  SYM_PP15_6X_CPW_3PORT:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3']
+    angles:
+      0:
+        pin1_P1: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: -0.5}
+      90:
+        pin1_P1: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: +0.5}
+      180:
+        pin1_P1: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: +0.5}
+      270:
+        pin1_P1: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: -0.5}
+  SYM_PP15_6X_CPW_SS:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2', 'P3', 'P4']
+    angles:
+      0:
+        pin1_P1: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: -0.5}
+        pin4_P4: {x: +0.75, y: -0.5}
+      90:
+        pin1_P1: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: +0.5, y: +0.5}
+        pin4_P4: {x: +0.5, y: +0.75}
+      180:
+        pin1_P1: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: +0.5}
+        pin4_P4: {x: -0.75, y: +0.5}
+      270:
+        pin1_P1: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_P3: {x: -0.5, y: -0.5}
+        pin4_P4: {x: -0.5, y: -0.75}
+  SYM_PP15_6X_DIODE:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['a1', 'P2']
+    angles:
+      0:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_a1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_PP15_6X_LS_Switch1:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['SOURCE', 'DRAIN', 'GATE']
+    angles:
+      0:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x: +1, y:  0.0}
+        pin3_GATE: {x: +0.5, y: -0.5}
+      90:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x:  0.0, y: +1}
+        pin3_GATE: {x: +0.5, y: +0.5}
+      180:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x: -1, y:  0.0}
+        pin3_GATE: {x: -0.5, y: +0.5}
+      270:
+        pin1_SOURCE: {x:  0.0, y:  0.0}
+        pin2_DRAIN: {x:  0.0, y: -1}
+        pin3_GATE: {x: -0.5, y: -0.5}
+  SYM_PP15_6X_MS:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['drain', 'P2']
+    angles:
+      0:
+        pin1_drain: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+      90:
+        pin1_drain: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+      180:
+        pin1_drain: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+      270:
+        pin1_drain: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+  SYM_PP15_6X_MS_SS:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['drain', 'P2']
+    angles:
+      0:
+        pin1_drain: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+      90:
+        pin1_drain: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+      180:
+        pin1_drain: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+      270:
+        pin1_drain: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+  SYM_PP15_6X_SW_Common:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['source', 'drain', 'P3']
+    angles:
+      0:
+        pin1_source: {x: +0.5, y: -0.5}
+        pin2_drain: {x: +0.5, y: +0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+      90:
+        pin1_source: {x: +0.5, y: +0.5}
+        pin2_drain: {x: -0.5, y: +0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+      180:
+        pin1_source: {x: -0.5, y: +0.5}
+        pin2_drain: {x: -0.5, y: -0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+      270:
+        pin1_source: {x: -0.5, y: -0.5}
+        pin2_drain: {x: +0.5, y: -0.5}
+        pin3_P3: {x:  0.0, y:  0.0}
+  SYM_PP15_6X_TFR:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_RInd:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_SCON:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_SInd:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  SYM_STACK:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['P1', 'P2']
+    angles:
+      0:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: +1, y:  0.0}
+      90:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: +1}
+      180:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x: -1, y:  0.0}
+      270:
+        pin1_P1: {x:  0.0, y:  0.0}
+        pin2_P2: {x:  0.0, y: -1}
+  WIN_lib_WIN_PHEMT1_6_3_G2_schematic:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['drain', 'P2', 'source']
+    angles:
+      0:
+        pin1_drain: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: +0.5, y: -0.5}
+      90:
+        pin1_drain: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: +0.5, y: +0.5}
+      180:
+        pin1_drain: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: -0.5, y: +0.5}
+      270:
+        pin1_drain: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: -0.5, y: -0.5}
+  WIN_lib_WIN_PHEMT_1_7_1_schematic:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['drain', 'P2', 'source']
+    angles:
+      0:
+        pin1_drain: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: +0.5, y: -0.5}
+      90:
+        pin1_drain: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: +0.5, y: +0.5}
+      180:
+        pin1_drain: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: -0.5, y: +0.5}
+      270:
+        pin1_drain: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: -0.5, y: -0.5}
+  WIN_lib_WIN_PHEMT_1_7_2_schematic:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-16"
+    ads_version: "ADS 2026 Update 1.2"
+    pin_names: ['drain', 'P2', 'source']
+    angles:
+      0:
+        pin1_drain: {x: +0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: +0.5, y: -0.5}
+      90:
+        pin1_drain: {x: -0.5, y: +0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: +0.5, y: +0.5}
+      180:
+        pin1_drain: {x: -0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: -0.5, y: +0.5}
+      270:
+        pin1_drain: {x: +0.5, y: -0.5}
+        pin2_P2: {x:  0.0, y:  0.0}
+        pin3_source: {x: -0.5, y: -0.5}

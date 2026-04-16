@@ -1,6 +1,6 @@
 cell_name: T_NETWORK_LCL
 source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\t_network_lcl\t_network_lcl_research.net
-generation_timestamp: '2026-04-15T14:44:12'
+generation_timestamp: '2026-04-15T21:48:07'
 phase_required: 1
 ports:
 - name: P1

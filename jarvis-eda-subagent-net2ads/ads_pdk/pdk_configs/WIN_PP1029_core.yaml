@@ -1,0 +1,202 @@
+# WIN_PP1029_core.yaml
+# PDK configuration for WIN Semi PP1029 GaAs pHEMT process (core load file)
+#
+# Usage: Load this file at every session start (Stage 1, Step 1).
+#   Contains essential PDK identity, component mappings, pin offsets, and placement rules.
+#   For full cell enumeration/lookup reference, see WIN_PP1029_reference.yaml (on-demand).
+
+# ── PDK identity ─────────────────────────────────────────────────────────────
+
+pdk_name: WIN_PP1029_DESIGN_KIT
+pdk_lib_name: WIN_PP1029_DESIGN_KIT       # ADS Python API library name (workspace.open_library())
+pdk_lib_path: "C:\\Users\\jarvis\\ads_projects\\design_kits\\WIN_PP1029_DESIGN_KIT"
+pdk_lib_defs: "C:\\Users\\jarvis\\ads_projects\\design_kits\\WIN_PP1029_DESIGN_KIT\\lib.defs"
+
+# ── Workspace setup rules ────────────────────────────────────────────────────
+# These rules are required for this PDK to load correctly in ADS.
+# Script: ads_create_pdk_workspace.py encodes this sequence.
+
+workspace_setup:
+  method: lib_defs_include
+  sequence:
+    - step: create_workspace        # de.create_workspace(wrk_dir) — writes default lib.defs
+    - step: append_pdk_include      # Append "INCLUDE <pdk_lib_defs>" to workspace lib.defs
+                                    # MUST happen AFTER create_workspace, BEFORE workspace.open()
+    - step: open_workspace          # workspace.open() — reads lib.defs, PDK becomes visible
+    - step: create_writable_lib     # de.create_new_library() + workspace.add_library()
+  known_warnings:
+    - "Syntax error in library definition file vtb.defs — benign, suppress with warnings.catch_warnings()"
+
+# ── Component map ─────────────────────────────────────────────────────────────
+# Maps rfscikit/netlist component types to PDK cells.
+# Used in Stage 1 (@PDK_SWAP annotation) and Stage 2 (cell reference substitution).
+#
+# Fields per entry:
+#   rfscikit_type:   component type tag in rfscikit .net / _prep.net @PDK_SWAP blocks
+#   ads_lib:         ADS Python API library name for de.LCVName()
+#   ads_cell:        ADS Python API cell name for de.LCVName()
+#                    ⚠ This is NOT the TransistorModel param value (PP1029_CPW_PDK)
+#                      It IS the name returned by workspace.open_library().cells
+#   ads_view:        ADS view name (always "symbol" for schematic placement)
+#   netlist_model:   The model identifier in ADS-generated netlists (from generate_netlist())
+#                    (Different from ads_cell — this is what appears in the .net export)
+#   pin_count:       Number of pins
+#   pin_names:       Pin names in order (pin1, pin2, pin3 ...)
+#   default_params:  Default parameter values (from ads_probe script, Run 1)
+#   notes:           Usage guidance
+
+component_map:
+
+  - rfscikit_type: TRANSISTOR_SWITCH_SERIES
+    description: "Series pHEMT FET — switch ON state, signal path inline"
+    ads_lib: WIN_PP1029_DESIGN_KIT
+    ads_cell: WIN_PP1029_CPW
+    ads_view: symbol
+    netlist_model: PP1029_CPW_PDK        # appears as "PP1029_CPW_PDK":Qxx in generate_netlist() output
+    pin_count: 3
+    pin_names: [gate, drain, source]     # pin1=gate, pin2=drain, pin3=source
+    port_mapping:
+      port1: drain   # RF signal in
+      port2: source  # RF signal out
+      port3: gate    # DC bias control
+    default_params:
+      NOF: "2"                           # number of gate fingers
+      UGW: "75.0 um"                     # unit gate width
+      Temp: "25"
+      NOISE: "1"
+      S_Deb: "1"
+      ExtP1: "NO"
+      ExtP2: "NO"
+    typical_params:
+      series_switch: {NOF: 2, UGW: "80 um"}   # 160 um total gate periphery
+    notes: >
+      Use for series switch FETs (signal flows drain→source).
+      Do NOT use WIN_PP1029_MS — it has source pre-grounded internally,
+      which breaks the switch topology.
+      GBIAS network (Rg || Cpg + Lsg) is separate and must be added explicitly.
+      Cgd feedback capacitor is INTERNAL to CPW model — do not add externally.
+
+  - rfscikit_type: TRANSISTOR_SWITCH_SHUNT
+    description: "Shunt pHEMT FET — switch OFF state absorptive termination"
+    ads_lib: WIN_PP1029_DESIGN_KIT
+    ads_cell: WIN_PP1029_CPW
+    ads_view: symbol
+    netlist_model: PP1029_CPW_PDK
+    pin_count: 3
+    pin_names: [gate, drain, source]
+    port_mapping:
+      port1: drain   # RF signal tap node
+      port2: source  # to absorptive termination (Rtrm → GND)
+      port3: gate    # DC bias control
+    default_params:
+      NOF: "2"
+      UGW: "75.0 um"
+      Temp: "25"
+      NOISE: "1"
+      S_Deb: "1"
+      ExtP1: "NO"
+      ExtP2: "NO"
+    typical_params:
+      shunt_switch: {NOF: 2, UGW: "50 um"}    # 100 um total gate periphery
+    notes: >
+      Use for shunt switch FETs (drain taps signal node, source to termination).
+      Keep Rtrm + Lrt passives — they are NOT replaced by PDK swap.
+      Gate bias stub (10 kΩ to GND) used in Phase 1; replace with real GBIAS network in Phase 2.
+
+  - rfscikit_type: RESISTOR
+    description: "Thin-film resistor (TFR)"
+    ads_lib: WIN_PP1029_DESIGN_KIT
+    ads_cell: PP1029_TFR
+    ads_view: symbol
+    netlist_model: PP1029_TFR
+    pin_count: 2
+    pin_names: [p1, p2]
+    notes: >
+      Use for bias resistors and termination resistors requiring PDK-accurate models.
+      For ideal passives (pad R, interconnect R) use ads_rflib:R — no PDK swap needed.
+    swap_threshold: "R >= 10 Ohm and in bias/control network"  # guideline only
+
+  - rfscikit_type: CAPACITOR_MIM
+    description: "MIM capacitor — custom size"
+    ads_lib: WIN_PP1029_DESIGN_KIT
+    ads_cell: PP1029_MIM_CAP_Custom
+    ads_view: symbol
+    netlist_model: PP1029_MIM_CAP_Custom
+    pin_count: 2
+    pin_names: [p1, p2]
+    notes: >
+      Use for RF bypass and coupling capacitors that need process-accurate models.
+      For ideal shunt caps (pad parasitics, interconnect pi-model) use ads_rflib:C.
+
+# ── Passives that stay ideal (no PDK swap) ───────────────────────────────────
+# These rfscikit component types map to ADS standard library elements.
+# Stage 1 annotates them with @KEEP — no @PDK_SWAP.
+
+ideal_passives:
+  - type: R
+    ads_lib: ads_rflib
+    ads_cell: R
+    keep_when: "pad parasitics, interconnect model, gate bias stubs in Phase 1"
+  - type: L
+    ads_lib: ads_rflib
+    ads_cell: L
+    keep_when: "bond pad inductance, interconnect pi-model, gate bias choke"
+  - type: C
+    ads_lib: ads_rflib
+    ads_cell: C
+    keep_when: "pad shunt capacitance, interconnect pi-model, Cgd (dropped — internal to CPW)"
+
+# ── Pin offsets ───────────────────────────────────────────────────────────────
+# Verified snap_point positions for WIN_PP1029_CPW.
+# Source: ads_probe_fet_pins.py — Run 1 (2026-04-06)
+# Probed by placing instance at origin (0,0) and reading InstPin.snap_point.
+# All offsets are RELATIVE to instance placement origin.
+#
+# ⚠ InstTerm.position does NOT exist in ADS 2026 Update 1.
+#   Use: inst.get_inst_term_iter() → it.inst_pins → ip.snap_point (PointF)
+
+pin_offsets:
+  WIN_PP1029_CPW:
+    probe_method: InstPin.snap_point
+    probe_date: "2026-04-06"
+    ads_version: "ADS 2026 Update 1"
+    angles:
+      0:
+        pin1_gate:   {x:  0.0, y:  0.0}
+        pin2_drain:  {x: +0.5, y: +0.5}
+        pin3_source: {x: +0.5, y: -0.5}
+      90:
+        pin1_gate:   {x:  0.0, y:  0.0}
+        pin2_drain:  {x: -0.5, y: +0.5}
+        pin3_source: {x: +0.5, y: +0.5}
+      180:
+        pin1_gate:   {x:  0.0, y:  0.0}
+        pin2_drain:  {x: -0.5, y: -0.5}
+        pin3_source: {x: -0.5, y: +0.5}
+      270:   # equivalent to -90
+        pin1_gate:   {x:  0.0, y:  0.0}
+        pin2_drain:  {x: +0.5, y: -0.5}
+        pin3_source: {x: -0.5, y: -0.5}
+
+# ── Placement recipes ─────────────────────────────────────────────────────────
+# Derived from pin offsets above. Ready-to-use placement formulas for builder scripts.
+# Signal path assumed at y=0, left-to-right flow.
+
+placement_recipes:
+  series_fet:
+    description: "Series FET — drain left, source right, gate below. Signal at y=0."
+    angle: 90
+    origin_formula: "(x_drain + 0.5, -0.5)"
+    resulting_pins:
+      gate:   "(x_drain + 0.5, -0.5)"    # below signal line
+      drain:  "(x_drain,       0.0)"      # signal in (left)
+      source: "(x_drain + 1.0, 0.0)"     # signal out (right)
+
+  shunt_fet:
+    description: "Shunt FET — drain taps signal node, source down to termination. Signal at y=0."
+    angle: 0
+    origin_formula: "(node_x - 0.5, -0.5)"
+    resulting_pins:
+      gate:   "(node_x - 0.5, -0.5)"    # left of signal tap, below signal line
+      drain:  "(node_x,        0.0)"     # signal tap
+      source: "(node_x,       -1.0)"     # to Rtrm → GND chain

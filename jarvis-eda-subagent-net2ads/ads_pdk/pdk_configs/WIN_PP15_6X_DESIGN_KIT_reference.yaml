@@ -1,0 +1,186 @@
+# WIN_PP15_6X_DESIGN_KIT_reference.yaml
+# PDK reference — full cell enumeration (load on demand only)
+#
+# Source: build_pdk_yaml.py (live ADS probe)
+# Generated: 2026-04-16
+# PDK path: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\ads_pdk\WIN_PP15_6X_DESIGN_KIT
+
+# ── Known cells with symbol view ──────────────────────────────────────────────
+# Load this file on demand when a cell name lookup is needed.
+# See WIN_PP15_6X_DESIGN_KIT_core.yaml for the recommended component mappings.
+
+known_cells_with_symbol:
+  - ModelCheck  # SPECIAL — not for schematic placement
+  - PP1561_CPW  # TRANSISTOR_SWITCH
+  - PP1561_CPW_OIP3_2X75  # TRANSISTOR_SWITCH
+  - PP1561_CPW_OIP3_4X75  # TRANSISTOR_SWITCH
+  - PP1561_DIODE  # PASSIVE_PDK
+  - PP1561_FGDIODE  # PASSIVE_PDK
+  - PP1561_MS  # PASSIVE_PDK
+  - PP1561_SW_LS_S  # TRANSISTOR_SWITCH
+  - PP156XCAPA  # CAPACITOR
+  - PP156XCAPA_Custom  # CAPACITOR
+  - PP156XINDRA  # INDUCTOR
+  - PP156XINDSA  # INDUCTOR
+  - PP156XMSR  # RESISTOR
+  - PP156XPAD  # PAD
+  - PP156X_BRIDGE  # BRIDGE
+  - PP156X_BVIA  # VIA
+  - PP156X_Bump  # PASSIVE_PDK
+  - PP156X_COV  # PASSIVE_PDK
+  - PP156X_GND  # GROUND
+  - PP156X_HOTVIA  # VIA
+  - PP156X_IND_ROUND_EM  # INDUCTOR
+  - PP156X_Include  # SPECIAL — not for schematic placement
+  - PP156X_MCRSOVER  # BRIDGE
+  - PP156X_PAD  # PAD
+  - PP156X_PAD_RF  # PAD
+  - PP156X_ProcVar  # SPECIAL — not for schematic placement
+  - PP156X_SL2_EM  # PASSIVE_PDK
+  - PP156X_TFR  # RESISTOR
+  - PP156X_TFR_Slim  # RESISTOR
+  - PP156X_VIA_M1_M2  # VIA
+  - PP156X_bv2t  # PASSIVE_PDK
+  - PP156X_mcfil  # TLINE
+  - PP156X_mclin  # TLINE
+  - PP156X_mcorn  # TLINE
+  - PP156X_mcross  # TLINE
+  - PP156X_mcurve  # TLINE
+  - PP156X_mlang  # TLINE
+  - PP156X_mlcrnr2  # TLINE
+  - PP156X_mlin  # TLINE
+  - PP156X_msabnd  # TLINE
+  - PP156X_mstep  # TLINE
+  - PP156X_mtaper  # TLINE
+  - PP156X_mtee  # TLINE
+  - SYM_CPW_PORT1D  # TRANSISTOR_SWITCH
+  - SYM_CPW_PORT1G  # TRANSISTOR_SWITCH
+  - SYM_CPW_PORT1S  # TRANSISTOR_SWITCH
+  - SYM_DIODE  # PASSIVE_PDK
+  - SYM_EGcontact  # PASSIVE_PDK
+  - SYM_HBT_3PORT  # TRANSISTOR_SWITCH
+  - SYM_MIM  # CAPACITOR
+  - SYM_PP15_6X_BACKVIA  # VIA
+  - SYM_PP15_6X_CAP_AIR  # CAPACITOR
+  - SYM_PP15_6X_COV  # PASSIVE_PDK
+  - SYM_PP15_6X_CPW  # TRANSISTOR_SWITCH
+  - SYM_PP15_6X_CPW_3PORT  # TRANSISTOR_SWITCH
+  - SYM_PP15_6X_CPW_SS  # TRANSISTOR_SWITCH
+  - SYM_PP15_6X_DIODE  # PASSIVE_PDK
+  - SYM_PP15_6X_KIT_include  # SPECIAL — not for schematic placement
+  - SYM_PP15_6X_LS_Switch1  # TRANSISTOR_SWITCH
+  - SYM_PP15_6X_MS  # PASSIVE_PDK
+  - SYM_PP15_6X_MS_SS  # PASSIVE_PDK
+  - SYM_PP15_6X_PAD  # PAD
+  - SYM_PP15_6X_SW_Common  # TRANSISTOR_SWITCH
+  - SYM_PP15_6X_TFR  # RESISTOR
+  - SYM_RInd  # INDUCTOR
+  - SYM_SCON  # PASSIVE_PDK
+  - SYM_SInd  # INDUCTOR
+  - SYM_STACK  # PASSIVE_PDK
+  - SYM_VIA_M0_M2  # VIA
+  - SYM_VIA_M1_M3  # VIA
+  - SYM_VIA_M2_M3  # VIA
+  - SYM_VIA_OHM_M2  # VIA
+  - WIN_lib_WIN_PHEMT1_6_3_G2_schematic  # TRANSISTOR_SWITCH
+  - WIN_lib_WIN_PHEMT_1_7_1_schematic  # TRANSISTOR_SWITCH
+  - WIN_lib_WIN_PHEMT_1_7_2_schematic  # TRANSISTOR_SWITCH
+
+# ── Cells by category ────────────────────────────────────────────────────────
+
+BRIDGE:
+  - PP156X_BRIDGE
+  - PP156X_MCRSOVER
+
+CAPACITOR:
+  - PP156XCAPA
+  - PP156XCAPA_Custom
+  - SYM_MIM
+  - SYM_PP15_6X_CAP_AIR
+
+GROUND:
+  - PP156X_GND
+
+INDUCTOR:
+  - PP156XINDRA
+  - PP156XINDSA
+  - PP156X_IND_ROUND_EM
+  - SYM_RInd
+  - SYM_SInd
+
+PAD:
+  - PP156XPAD
+  - PP156X_PAD
+  - PP156X_PAD_RF
+  - SYM_PP15_6X_PAD
+
+PASSIVE_PDK:
+  - PP1561_DIODE
+  - PP1561_FGDIODE
+  - PP1561_MS
+  - PP156X_Bump
+  - PP156X_COV
+  - PP156X_SL2_EM
+  - PP156X_bv2t
+  - SYM_DIODE
+  - SYM_EGcontact
+  - SYM_PP15_6X_COV
+  - SYM_PP15_6X_DIODE
+  - SYM_PP15_6X_MS
+  - SYM_PP15_6X_MS_SS
+  - SYM_SCON
+  - SYM_STACK
+
+RESISTOR:
+  - PP156XMSR
+  - PP156X_TFR
+  - PP156X_TFR_Slim
+  - SYM_PP15_6X_TFR
+
+SPECIAL:
+  - ModelCheck
+  - PP156X_Include
+  - PP156X_ProcVar
+  - SYM_PP15_6X_KIT_include
+
+TLINE:
+  - PP156X_mcfil
+  - PP156X_mclin
+  - PP156X_mcorn
+  - PP156X_mcross
+  - PP156X_mcurve
+  - PP156X_mlang
+  - PP156X_mlcrnr2
+  - PP156X_mlin
+  - PP156X_msabnd
+  - PP156X_mstep
+  - PP156X_mtaper
+  - PP156X_mtee
+
+TRANSISTOR_SWITCH:
+  - PP1561_CPW
+  - PP1561_CPW_OIP3_2X75
+  - PP1561_CPW_OIP3_4X75
+  - PP1561_SW_LS_S
+  - SYM_CPW_PORT1D
+  - SYM_CPW_PORT1G
+  - SYM_CPW_PORT1S
+  - SYM_HBT_3PORT
+  - SYM_PP15_6X_CPW
+  - SYM_PP15_6X_CPW_3PORT
+  - SYM_PP15_6X_CPW_SS
+  - SYM_PP15_6X_LS_Switch1
+  - SYM_PP15_6X_SW_Common
+  - WIN_lib_WIN_PHEMT1_6_3_G2_schematic
+  - WIN_lib_WIN_PHEMT_1_7_1_schematic
+  - WIN_lib_WIN_PHEMT_1_7_2_schematic
+
+VIA:
+  - PP156X_BVIA
+  - PP156X_HOTVIA
+  - PP156X_VIA_M1_M2
+  - SYM_PP15_6X_BACKVIA
+  - SYM_VIA_M0_M2
+  - SYM_VIA_M1_M3
+  - SYM_VIA_M2_M3
+  - SYM_VIA_OHM_M2

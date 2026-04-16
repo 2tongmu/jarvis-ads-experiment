@@ -1,6 +1,6 @@
 cell_name: RC_SERIES_SHUNT
-source_ir: /home/jarvis/.openclaw/workspace/jarvis-ads-experiment/jarvis-eda-subagent-net2ads/examples/rc_series_shunt/rc_series_shunt_research.net
-generation_timestamp: '2026-04-15T16:52:24'
+source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\rc_series_shunt\rc_series_shunt_research.net
+generation_timestamp: '2026-04-15T21:48:03'
 phase_required: 1
 ports:
 - name: P1

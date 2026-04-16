@@ -1,3 +1,11 @@
 *.pyc
 __pycache__/
 *.cfg
+
+# PDK binary library files — large OA databases, not for version control
+jarvis-eda-subagent-net2ads/ads_pdk/WIN_PP1029_DESIGN_KIT/
+jarvis-eda-subagent-net2ads/ads_pdk/WIN_PP15_6X_DESIGN_KIT/
+
+# ADS-generated workspace artifacts
+de_sim.cfg
+hpeesofsim.cfg
