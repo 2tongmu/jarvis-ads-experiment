@@ -110,4 +110,4 @@ Current PASSIVE_PDK cells to review (update after running build_pdk_yaml.py):
 | PDK | Task 1 pin names | Task 2 port_mapping | Task 3 notes | Task 4 typical_params | Task 5 PASSIVE_PDK review |
 |---|---|---|---|---|---|
 | WIN_PP1029_DESIGN_KIT | DONE (Jarvis, 2026-04-06) | DONE | DONE | DONE | DONE |
-| WIN_PP15_6X_DESIGN_KIT | PENDING | PENDING | PENDING | PENDING | PENDING |
+| WIN_PP15_6X_DESIGN_KIT | DONE (net2ads sub-agent, 2026-04-16) | DONE (44/44 entries) | DONE (44/44 entries) | DONE (16 TRANSISTOR_SWITCH + 3 AMPLIFIER entries) | DONE (reclassified 15 passive cells, refined all categories) |

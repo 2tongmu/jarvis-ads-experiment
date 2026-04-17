@@ -1131,3 +1131,238 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FULL WORKFLOW DOCUMENTATION — build_pdk_yaml.py + Manual Post-Processing
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# This script is the FIRST PHASE of PDK integration into the net2ads pipeline.
+# It generates two YAML files from live ADS probing. However, the generated
+# files require MANUAL POST-PROCESSING to be production-ready. This section
+# documents the full workflow.
+#
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 1: AUTOMATED PDK DISCOVERY & PROBING
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Input:  ads_pdk/<PDK_NAME>/lib.defs  (PDK library definition file)
+# Output: ads_pdk/pdk_configs/<PDK_NAME>_core.yaml (component map + pin offsets)
+#         ads_pdk/pdk_configs/<PDK_NAME>_reference.yaml (full cell enumeration)
+#
+# Execution:
+# ──────────
+# On Windows with ADS 2026 Update 1.2 installed:
+#
+#   cd C:\<workspace>\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\ads_pdk\pdk_tools
+#   "C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe" build_pdk_yaml.py
+#
+# For a single PDK:
+#   "C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe" build_pdk_yaml.py --pdk WIN_PP15_6X_DESIGN_KIT
+#
+# To force regeneration of an existing PDK config:
+#   "C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe" build_pdk_yaml.py --pdk WIN_PP15_6X_DESIGN_KIT --force
+#
+# What the script does:
+# ─────────────────────
+# 1. Discovers all lib.defs files in ads_pdk/ subdirectories
+# 2. For each unprocessed PDK, opens ADS and loads the PDK library
+# 3. Enumerates all cells with symbol views
+# 4. For each cell:
+#    a. Classifies type (TRANSISTOR_SWITCH, RESISTOR, CAPACITOR, etc.)
+#       using domain knowledge heuristics (parameter names, cell name fragments)
+#    b. Places the cell in a scratch design
+#    c. Probes pin names (inst.term.name) and snap_points at 0°/90°/180°/270°
+#    d. Reads default parameters from the placed instance
+#    e. Rolls back transaction (no permanent changes to ADS project)
+# 5. Writes _core.yaml with component_map and pin_offsets
+# 6. Writes _reference.yaml with full cell enumeration (for lookup)
+#
+# Domain knowledge embedded in build_pdk_yaml.py:
+# ───────────────────────────────────────────────
+# • TRANSISTOR_PIN_RULE: 3 terminals → TRANSISTOR_SWITCH
+#                        2 terminals → TRANSISTOR_AMPLIFIER
+# • Parameter heuristics: NOF/UGW → pHEMT, R → resistor, C → capacitor, etc.
+# • Cell name matching: "CPW" → transistor, "TFR" → resistor, "VIA" → via, etc.
+#
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 2: MANUAL POST-PROCESSING (JARVIS_PDK_TASKS.md)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# The generated _core.yaml is a SKELETON. It contains:
+#   • Correct PDK identity and workspace setup rules
+#   • Correct component classification (mostly)
+#   • Correct pin names (probed from ADS API)
+#   • Correct pin snap_points (probed at all angles)
+#   • Blank placeholder values for design-level guidance fields
+#
+# Five manual tasks must be completed for production use:
+#
+# TASK 1 — Verify semantic pin names (5 min per PDK)
+# ────────────────────────────────────────────────────
+# Automated pin probing returns raw ADS pin names (P1, P2, P3, etc.).
+# These are often generic. Replace with semantic names:
+#   • For FETs: [gate, drain, source]
+#   • For BJTs: [base, collector, emitter]
+#   • For diodes: [anode, cathode]
+#   • For passives: [port1, port2] or role-specific names
+#
+# Check PDK documentation or AEL cell descriptions if needed.
+# Update pin_names list in component_map entries.
+# Update pin_offsets section labels to match (pin1_gate, pin2_drain, etc.)
+#
+# TASK 2 — Add port_mapping for signal-path components (2 min per PDK)
+# ──────────────────────────────────────────────────────────────────────
+# For every component (especially transistors and passives),
+# add a port_mapping block that maps physical pins to circuit roles:
+#
+#   Example (TRANSISTOR_SWITCH):
+#     port_mapping:
+#       port1: drain      # RF signal in
+#       port2: source     # RF signal out
+#       port3: gate       # DC bias control
+#
+#   Example (RESISTOR):
+#     port_mapping:
+#       port1: p1
+#       port2: p2
+#
+# This enables the placement engine to auto-route signal paths.
+#
+# TASK 3 — Add notes for key components (5 min per PDK)
+# ──────────────────────────────────────────────────────
+# For each TRANSISTOR_SWITCH, TRANSISTOR_AMPLIFIER, and DIODE:
+#   • Intended use case (series switch, amplifier, detector, etc.)
+#   • Known constraints (max gate width, finger count range, etc.)
+#   • What NOT to use the cell for (critical warnings)
+#   • PDK-specific quirks (pre-grounded pins, internal feedback, etc.)
+#
+# Example:
+#   notes: >
+#     Use for series switch FETs (signal flows drain→source).
+#     Do NOT use for shunt—source is internally grounded.
+#     Gate bias network must be added separately.
+#
+# TASK 4 — Add typical_params for common use cases (3 min per PDK)
+# ──────────────────────────────────────────────────────────────────
+# For TRANSISTOR_SWITCH cells, add:
+#
+#   typical_params:
+#     series_switch: {NOF: 2, UGW: "80 um"}
+#     shunt_switch:  {NOF: 2, UGW: "50 um"}
+#
+# These values come from:
+#   • PDK design guides and reference schematics
+#   • Published design rules and best practices
+#   • Circuit simulators' recommended operating points
+#
+# TASK 5 — Review PASSIVE_PDK entries (10 min per PDK)
+# ────────────────────────────────────────────────────
+# build_pdk_yaml.py classifies unrecognised cells as PASSIVE_PDK.
+# Review each and refine to more specific types:
+#   • Diode (Schottky, PIN, varactor) → DIODE, VARACTOR_DIODE
+#   • EM-simulated structures → PASSIVE_EM, PASSIVE_EM_BALUN
+#   • Contact/via elements → CONTACT_ELEMENT, INTERCONNECT_ELEMENT
+#   • Special cells (substrate ties, stacks) → appropriate role
+#
+# Example reclassification:
+#   Generated: rfscikit_type: PASSIVE_PDK (PP1561_DIODE)
+#   Refined:   rfscikit_type: DIODE
+#
+# ═════════════════════════════════════════════════════════════════════════════
+# WORKFLOW TIMELINE FOR A NEW PDK
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Step 1: Add PDK to ads_pdk/ directory
+#         Copy <PDK_NAME> folder with its lib.defs into ads_pdk/
+#
+# Step 2: Run automated probing (Phase 1)
+#         $ python.exe build_pdk_yaml.py --pdk <PDK_NAME>
+#         Generates: pdk_configs/<PDK_NAME>_core.yaml
+#                    pdk_configs/<PDK_NAME>_reference.yaml
+#         Time: 2-5 minutes (depending on number of cells)
+#
+# Step 3: Review and post-process (Phase 2)
+#         Open pdk_configs/<PDK_NAME>_core.yaml in text editor
+#         Complete all 5 JARVIS_PDK_TASKS.md tasks
+#         Time: 15-30 minutes per PDK (for complete, production-ready config)
+#
+# Step 4: Validate
+#         $ python.exe build_pdk_yaml.py --validate <PDK_NAME>
+#         Re-probes PDK library and compares stored pin offsets against live ADS
+#         Confirms snap_points are still correct (sanity check)
+#
+# Step 5: Integrate into pipeline
+#         Update JARVIS_PDK_TASKS.md status table
+#         <PDK_NAME>_core.yaml is ready for production use in:
+#           • net2ads schematic builder (PDK cell selection)
+#           • placement engine (snap_point routing)
+#           • DRC verification (pin location validation)
+#
+# ═════════════════════════════════════════════════════════════════════════════
+# IMPLEMENTATION NOTES
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Why separate _core.yaml and _reference.yaml?
+# ─────────────────────────────────────────────
+# _core.yaml contains:
+#   • Essential component map for every session
+#   • Pin offsets for layout and routing
+#   • Design guidance (notes, typical_params)
+#
+# _reference.yaml contains:
+#   • Full enumeration of all cells in the PDK
+#   • Category breakdown (VIA, GROUND, PAD, etc.)
+#   • Used for debugging and lookups only
+#   • Loaded on-demand (reduces memory footprint for large PDKs)
+#
+# Why is pin probing done at 4 angles?
+# ─────────────────────────────────────
+# RF schematic placements require components at 0°, 90°, 180°, 270° rotations.
+# Each rotation has different snap_point geometry. The script probes all four
+# to enable the placement engine to route correctly at any orientation.
+#
+# What if a cell has no parameters?
+# ──────────────────────────────────
+# The script sets default_params: {} and logs a notice.
+# During placement, the script can either:
+#   a. Use all cells at default size
+#   b. Skip parameterized cells and ask user
+#   c. Infer parameters from cell name (e.g., "CPW_40um" → UGW: "40 um")
+#
+# ═════════════════════════════════════════════════════════════════════════════
+# EXAMPLE: COMPLETING WIN_PP15_6X_DESIGN_KIT (Reference)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Execution time: ~5 min (Phase 1 automated)
+#
+#   $ python.exe build_pdk_yaml.py --pdk WIN_PP15_6X_DESIGN_KIT
+#   [*] Discovering PDKs...
+#   [+] Found WIN_PP15_6X_DESIGN_KIT — 51 cells with symbols
+#   [*] Probing cell parameters, pin names, snap_points...
+#   [*] Classifying components (TRANSISTOR_SWITCH, RESISTOR, CAPACITOR, ...)
+#   [+] Generated WIN_PP15_6X_DESIGN_KIT_core.yaml (44 components)
+#   [+] Generated WIN_PP15_6X_DESIGN_KIT_reference.yaml (51 cells enumerated)
+#   ✓ Done: 1/1 PDKs processed
+#
+# Manual post-processing (Phase 2): ~30 min
+#
+#   1. Opened WIN_PP15_6X_DESIGN_KIT_core.yaml in text editor
+#   2. Task 1: Updated 44 pin_names entries from generic (P1,P2,P3) to semantic
+#   3. Task 2: Added port_mapping to all 44 component entries
+#   4. Task 3: Added detailed notes for all transistors, diodes, passives
+#   5. Task 4: Added typical_params for 16 TRANSISTOR_SWITCH cells (series/shunt)
+#   6. Task 5: Reclassified 15 PASSIVE_PDK cells to specific types
+#              (DIODE, VARACTOR_DIODE, TRANSISTOR_AMPLIFIER, INTERCONNECT_ELEMENT, etc.)
+#   7. Saved and validated YAML syntax
+#   8. Updated JARVIS_PDK_TASKS.md status table
+#
+# Final result: Production-ready config for net2ads pipeline
+#   • 44 components fully characterized
+#   • 100% port_mapping coverage
+#   • 100% semantic pin naming
+#   • All transistors and passives with usage notes
+#   • Typical parameter sets for design automation
+#
+# ═════════════════════════════════════════════════════════════════════════════
+#
