@@ -127,6 +127,65 @@ def _map_params(ir_params: dict, param_map_list: list) -> dict:
     return result
 
 
+# ── Tline physical dimension synthesis ───────────────────────────────────────
+
+def _tline_calc_params(
+    ir_comp: IRComponent,
+    pdk_override: dict,
+    warnings: list,
+) -> dict:
+    """
+    Synthesize PDK microstrip parameters (W, L) from TLIN electrical specs.
+
+    Reads Z0, ELength, Fref from ir_comp.params, calls tline_calc.microstrip_w_l_from_strings(),
+    and returns a dict with keys W and L as ADS unit strings (e.g. "39.6 um", "2388.2 um").
+
+    Args:
+        ir_comp      : IRComponent with type=TLIN and params {Z0, ELength, Fref}
+        pdk_override : pdk_override block from ads_mapping.yaml (provides pdk_name, subst_name)
+        warnings     : mutable warnings list — errors are appended here
+
+    Returns:
+        dict of ADS parameter values, e.g. {"W": "39.6 um", "L": "2388.2 um"}
+        Falls back to {"W": "50 um", "L": "1000 um"} on failure.
+    """
+    try:
+        from design_utils.tline_calc import microstrip_w_l_from_strings
+    except ImportError as exc:
+        warnings.append(
+            f"[WARN] TLIN '{ir_comp.id}': tline_calc not available ({exc}). "
+            "Using fallback W=50um, L=1000um."
+        )
+        return {"W": "50 um", "L": "1000 um"}
+
+    Z0_str  = ir_comp.params.get("Z0", "50 Ohm")
+    EL_str  = ir_comp.params.get("ELength", "90 deg")
+    FR_str  = ir_comp.params.get("Fref", "10 GHz")
+    pdk     = pdk_override.get("pdk_name", "WIN_PP1029_DESIGN_KIT")
+
+    try:
+        W_um, L_um = microstrip_w_l_from_strings(Z0_str, EL_str, FR_str, pdk_name=pdk)
+    except Exception as exc:
+        warnings.append(
+            f"[WARN] TLIN '{ir_comp.id}': tline_calc failed ({exc}). "
+            "Using fallback W=50um, L=1000um."
+        )
+        return {"W": "50 um", "L": "1000 um"}
+
+    params = {
+        "W": f"{W_um:.2f} um",
+        "L": f"{L_um:.2f} um",
+    }
+    # Add substrate param if pdk_override specifies a non-empty subst_name
+    subst = pdk_override.get("subst_name", "")
+    if subst:
+        params["Subst"] = subst
+
+    print(f"  [tline_calc] {ir_comp.id}: Z0={Z0_str} EL={EL_str} Fref={FR_str}  "
+          f"-> W={params['W']}  L={params['L']}")
+    return params
+
+
 # ── Component mapping ──────────────────────────────────────────────────────────
 
 def _map_component(
@@ -191,16 +250,23 @@ def _map_component(
             ads_lib  = pdk_override["ads_lib"]
             ads_cell = pdk_override["ads_cell"]
             ads_view = pdk_override.get("ads_view", "symbol")
-            param_map_list = pdk_override.get("param_map", entry.get("param_map", []))
             api_status = "UNCONFIRMED"
+
+            # PDK microstrip synthesis: compute W/L from Z0/ELength/Fref
+            transform = pdk_override.get("param_transform", "")
+            if transform == "tline_calc_microstrip":
+                mapped_params = _tline_calc_params(ir_comp, pdk_override, warnings)
+            else:
+                param_map_list = pdk_override.get("param_map", entry.get("param_map", []))
+                mapped_params  = _map_params(ir_comp.params, param_map_list)
         else:
             ads_lib  = entry["ads_lib"]
             ads_cell = entry["ads_cell"]
             ads_view = entry.get("ads_view", "symbol")
             param_map_list = entry.get("param_map", [])
             api_status = entry.get("api_status", "UNCONFIRMED")
+            mapped_params = _map_params(ir_comp.params, param_map_list)
 
-        mapped_params = _map_params(ir_comp.params, param_map_list)
         instances.append(BuildInstance(
             id=ir_comp.id,
             ads_lib=ads_lib,

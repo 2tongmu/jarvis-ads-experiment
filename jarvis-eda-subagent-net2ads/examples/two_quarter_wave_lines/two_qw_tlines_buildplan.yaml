@@ -1,0 +1,40 @@
+cell_name: TWO_QW_TLINES
+source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\two_quarter_wave_lines\two_quarter_wave_lines_research.net
+generation_timestamp: '2026-04-17T00:59:37'
+phase_required: 2
+ports:
+- name: P1
+  node: P1
+  number: 1
+- name: P2
+  node: P2
+  number: 2
+instances:
+- id: TL1
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: PP1029_mlin
+  ads_view: symbol
+  params:
+    W: 73.70 um
+    L: 2584.33 um
+  role: tline
+  nodes:
+  - P1
+  - N_MID
+  phase_required: 2
+  api_status: UNCONFIRMED
+- id: TL2
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: PP1029_mlin
+  ads_view: symbol
+  params:
+    W: 29.27 um
+    L: 2665.48 um
+  role: tline
+  nodes:
+  - N_MID
+  - P2
+  phase_required: 2
+  api_status: UNCONFIRMED
+design_variables: []
+warnings: []

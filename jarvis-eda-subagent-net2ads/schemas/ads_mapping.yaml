@@ -117,11 +117,14 @@ component_map:
       series_angle: 0.0         # horizontal in signal path
       width_units: 2.0          # TLIN occupies 2 schematic units (wider than R/L/C)
     pdk_override:
-      enabled: false            # set to true to use a PDK-specific TLine component
-      ads_lib: ~                # e.g., WIN_PP1029_DESIGN_KIT
-      ads_cell: ~               # e.g., PP1029_CPW_TLIN (cell name TBD — needs probe)
+      enabled: false            # set to true via --pdk flag in net2ads.py
+      ads_lib: WIN_PP1029_DESIGN_KIT
+      ads_cell: PP1029_mlin     # confirmed cell name in WIN_PP1029_reference.yaml
       ads_view: symbol
-      param_map: []             # override param_map when pdk_override.enabled=true
+      pdk_name: WIN_PP1029_DESIGN_KIT   # used by tline_calc for substrate lookup
+      param_transform: tline_calc_microstrip  # trigger W/L synthesis in ads_mapper.py
+      subst_name: ""            # PDK cell has substrate baked in — leave empty
+      param_map: []             # W/L injected by tline_calc; no direct pass-through
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 3 — Switch element mapping (SW)

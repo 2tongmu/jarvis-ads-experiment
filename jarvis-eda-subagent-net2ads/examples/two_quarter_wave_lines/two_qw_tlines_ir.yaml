@@ -1,0 +1,62 @@
+cell_name: TWO_QW_TLINES
+source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\two_quarter_wave_lines\two_quarter_wave_lines_research.net
+parse_timestamp: '2026-04-17T00:59:37'
+phase_required: 2
+ports:
+- name: P1
+  node: P1
+  number: 1
+- name: P2
+  node: P2
+  number: 2
+nodes:
+- name: N_MID
+  is_port: false
+  connects_to_ground: false
+- name: P1
+  is_port: true
+  connects_to_ground: false
+- name: P2
+  is_port: true
+  connects_to_ground: false
+components:
+- id: TL1
+  type: TLIN
+  nodes:
+  - P1
+  - N_MID
+  params:
+    Z0: 50 Ohm
+    ELength: 90 deg
+    Fref: 10 GHz
+  role: tline
+  phase_required: 2
+- id: TL2
+  type: TLIN
+  nodes:
+  - N_MID
+  - P2
+  params:
+    Z0: 70.7 Ohm
+    ELength: 90 deg
+    Fref: 10 GHz
+  role: tline
+  phase_required: 2
+graph:
+  backbone:
+  - P1
+  - N_MID
+  - P2
+  backbone_components:
+  - TL1
+  - TL2
+  shunt_branches: []
+  switch_arms: []
+metadata:
+  warnings: []
+  port_count: 2
+  component_count: 2
+  series_count: 0
+  shunt_count: 0
+  tline_count: 2
+  switch_count: 0

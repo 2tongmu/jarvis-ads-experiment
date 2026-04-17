@@ -340,7 +340,53 @@ def _ph_C(session, design, inst):
 _PASSIVE_PLACER_REGISTRY["R"] = _ph_R   # ✅ CONFIRMED
 _PASSIVE_PLACER_REGISTRY["L"] = _ph_L   # ✅ CONFIRMED 2026-04-15
 _PASSIVE_PLACER_REGISTRY["C"] = _ph_C   # ✅ CONFIRMED
-# Phase 2: _PASSIVE_PLACER_REGISTRY["TLIN"] = _ph_TLIN   (not yet implemented)
+
+
+# ── Phase 2: PDK transmission line placer ─────────────────────────────────────
+
+def _place_pdk_tline(session: "ADSSession", design, inst) -> object:
+    """
+    Generic placer for PDK microstrip transmission line cells.
+
+    Places any PDK tline cell (e.g. PP1029_mlin from WIN_PP1029_DESIGN_KIT) using
+    the confirmed design.add_instance() + inst.parameters[key].value pattern.
+
+    Parameters in inst.params are set one by one with individual try/except so
+    that a missing or renamed parameter does not abort the whole placement.
+    Unknown parameter names are logged as warnings, not fatal errors.
+
+    API status:
+        de.LCVName(ads_lib, ads_cell, "symbol")    ✅ CONFIRMED (same as ads_rflib)
+        design.add_instance(lcv, (x,y), name, angle) ✅ CONFIRMED
+        inst.parameters[key].value = expr            ✅ CONFIRMED
+    """
+    ads_inst = design.add_instance(
+        session.de.LCVName(inst.ads_lib, inst.ads_cell, inst.ads_view),  # ✅ CONFIRMED
+        (inst.x, inst.y),
+        name=inst.id,
+        angle=inst.angle,
+    )
+    set_ok = []
+    set_fail = []
+    for k, v in inst.params.items():
+        try:
+            ads_inst.parameters[k].value = v   # ✅ CONFIRMED
+            set_ok.append(f"{k}={v}")
+        except (KeyError, AttributeError) as exc:
+            set_fail.append(f"{k}={v} ({exc})")
+
+    print(f"[tline] '{inst.id}' {inst.ads_lib}:{inst.ads_cell} "
+          f"@ ({inst.x}, {inst.y}) angle={inst.angle}")
+    if set_ok:
+        print(f"  params set   : {', '.join(set_ok)}")
+    if set_fail:
+        print(f"  params FAILED: {', '.join(set_fail)}")
+        print(f"  NOTE: Probe actual param names via build_pdk_yaml.py and update ads_mapping.yaml")
+    return ads_inst
+
+
+# Register Phase 2: PDK microstrip tline cell
+_PASSIVE_PLACER_REGISTRY["PP1029_mlin"] = _place_pdk_tline
 
 
 # ── Sub-circuit instances ──────────────────────────────────────────────────────

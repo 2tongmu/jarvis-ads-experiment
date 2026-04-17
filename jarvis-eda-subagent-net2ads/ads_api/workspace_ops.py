@@ -136,6 +136,89 @@ def close_workspace(session: ADSSession) -> None:
         print(f"[workspace] close_workspace() failed (non-fatal): {exc}")
 
 
+def open_workspace_with_pdk(
+    session: ADSSession,
+    ws_path: str,
+    pdk_lib_defs: str,
+    lib_name: str,
+):
+    """
+    Create (if needed) and open an ADS workspace that includes a PDK.
+
+    Uses the confirmed pre-write lib.defs + de.open_workspace() pattern.
+    Does NOT use de.create_workspace() (⚠️ UNCONFIRMED) or workspace.add_library().
+
+    Workspace lib.defs written:
+        INCLUDE $HPEESOF_DIR/oalibs/analog_rf.defs
+        INCLUDE <pdk_lib_defs>
+        DEFINE <lib_name> <lib_name>
+        ASSIGN <lib_name> libMode shared
+
+    The PDK library becomes visible via de.get_open_library(pdk_lib_name) after
+    open_workspace() — no separate add_library() call needed.
+
+    Args:
+        session      : ADSSession from get_ads_session()
+        ws_path      : absolute path for the workspace directory (created if missing)
+        pdk_lib_defs : absolute path to the PDK's lib.defs file
+                       (e.g. "C:/path/to/WIN_PP1029_DESIGN_KIT/lib.defs")
+        lib_name     : target writable library name to register in this workspace
+
+    Returns:
+        workspace object
+
+    Raises:
+        FileNotFoundError : pdk_lib_defs does not exist
+        RuntimeError      : de.open_workspace() fails
+    """
+    pdk_defs_path = Path(pdk_lib_defs)
+    if not pdk_defs_path.exists():
+        raise FileNotFoundError(
+            f"PDK lib.defs not found: {pdk_lib_defs}\n"
+            "Verify the PDK installation path."
+        )
+
+    ws = Path(ws_path)
+    ws.mkdir(parents=True, exist_ok=True)
+    lib_path = ws / lib_name
+
+    # cds.lib — required by ADS workspace open
+    cds_lib = ws / "cds.lib"
+    if not cds_lib.exists():
+        cds_lib.write_text("softinclude lib.defs\n", encoding="utf-8")
+        print(f"[workspace] wrote cds.lib")
+
+    # lib.defs — INCLUDE analog_rf + PDK + DEFINE target library
+    lib_defs_path = ws / "lib.defs"
+    pdk_include_line = f"INCLUDE {pdk_defs_path.as_posix()}\n"
+    lib_defs_content = (
+        "INCLUDE $HPEESOF_DIR/oalibs/analog_rf.defs\n"
+        + pdk_include_line
+        + f"DEFINE {lib_name} {lib_name}\n"
+        + f"ASSIGN {lib_name} libMode shared\n"
+    )
+    current = lib_defs_path.read_text(encoding="utf-8") if lib_defs_path.exists() else ""
+    if pdk_include_line not in current or f"DEFINE {lib_name}" not in current:
+        lib_defs_path.write_text(lib_defs_content, encoding="utf-8")
+        print(f"[workspace] wrote lib.defs  PDK={pdk_defs_path.name}  lib={lib_name}")
+
+    # Library directory — create if missing
+    if not lib_path.exists():
+        lib_path.mkdir()
+        (lib_path / "cdsinfo.tag").write_text(
+            "CDSLIBRARY\nEDITION 5.0\n", encoding="utf-8"
+        )
+        print(f"[library] created directory: {lib_path}")
+
+    # Open workspace (✅ CONFIRMED)
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("ignore")   # suppress vtb.defs warning
+        ws_obj = session.de.open_workspace(str(ws))   # ✅ CONFIRMED
+
+    print(f"[workspace] opened (with PDK {pdk_defs_path.parent.name}): {ws_path}")
+    return ws_obj
+
+
 # ── Library ────────────────────────────────────────────────────────────────────
 
 def ensure_library(session: ADSSession, lib_name: str, lib_path: Optional[str] = None):

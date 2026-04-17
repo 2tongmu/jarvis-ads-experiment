@@ -45,6 +45,7 @@ Status block (stdout, end of every run):
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 # ── Subagent root on sys.path ──────────────────────────────────────────────────
 SUBAGENT_DIR   = Path(__file__).resolve().parent
@@ -71,7 +72,61 @@ def _parse_args():
                         "(default: same directory as the netlist)")
     p.add_argument("--dry-run", action="store_true",
                    help="Run pipeline stages 1-4 and write artifacts; skip ADS API calls")
+    p.add_argument("--pdk", default=None, metavar="PDK_NAME",
+                   help="PDK name for component mapping and workspace setup "
+                        "(e.g. WIN_PP1029_DESIGN_KIT). "
+                        "Enables pdk_override in ads_mapping.yaml so TLIN maps to the "
+                        "PDK microstrip cell. PDK lib.defs must exist at "
+                        "ads_pdk/<PDK_NAME>/lib.defs relative to the net2ads root.")
     return p.parse_args()
+
+
+# ── PDK lib.defs resolution ───────────────────────────────────────────────────
+
+def _resolve_pdk_lib_defs(pdk_name: str) -> Optional[Path]:
+    """
+    Find the PDK lib.defs file for a given PDK name.
+
+    Search order:
+      1. <subagent_root>/ads_pdk/<pdk_name>/lib.defs   (local install)
+      2. pdk_lib_defs entry in pdk_configs/<pdk_name>_core.yaml  (Jarvis path)
+
+    Returns the resolved Path, or None if not found.
+    """
+    # 1. Local install path (relative to this script)
+    local_path = SUBAGENT_DIR / "ads_pdk" / pdk_name / "lib.defs"
+    if local_path.exists():
+        return local_path
+
+    # 2. Jarvis path from core.yaml
+    core_yaml = SUBAGENT_DIR / "ads_pdk" / "pdk_configs" / f"{pdk_name}_core.yaml"
+    if core_yaml.exists():
+        try:
+            import yaml as _yaml
+            with open(core_yaml, encoding="utf-8") as f:
+                cfg = _yaml.safe_load(f)
+            jarvis_defs = cfg.get("pdk_lib_defs", "")
+            if jarvis_defs and Path(jarvis_defs).exists():
+                return Path(jarvis_defs)
+        except Exception:
+            pass
+
+    return None
+
+
+def _enable_pdk_override(config: dict, pdk_name: str) -> None:
+    """
+    Patch the loaded mapping config to enable pdk_override for TLIN entries
+    that match the given PDK name.
+
+    Modifies config in-place.
+    """
+    for entry in config.get("component_map", []):
+        if entry.get("research_type", "").upper() == "TLIN":
+            override = entry.get("pdk_override", {})
+            if override.get("ads_lib") == pdk_name:
+                override["enabled"] = True
+                print(f"[mapping] enabled pdk_override for TLIN -> {pdk_name}:{override.get('ads_cell')}")
 
 
 # ── Workspace file setup ───────────────────────────────────────────────────────
@@ -134,6 +189,7 @@ def _status(status: str, stage: int, outputs: list, next_action: str, errors) ->
 def main():
     args    = _parse_args()
     dry_run = args.dry_run
+    pdk_name = args.pdk   # may be None
 
     net_path = Path(args.netlist).resolve()
     if not net_path.exists():
@@ -146,6 +202,15 @@ def main():
         print("        Example: python net2ads.py my.net --workspace C:/ads/my_workspace")
         sys.exit(1)
 
+    # Resolve PDK lib.defs when --pdk is specified
+    pdk_lib_defs: Optional[Path] = None
+    if pdk_name:
+        pdk_lib_defs = _resolve_pdk_lib_defs(pdk_name)
+        if pdk_lib_defs is None and not dry_run:
+            print(f"[ERROR] PDK lib.defs not found for '{pdk_name}'.")
+            print(f"  Looked in: {SUBAGENT_DIR / 'ads_pdk' / pdk_name / 'lib.defs'}")
+            sys.exit(1)
+
     output_dir = Path(args.output_dir).resolve() if args.output_dir else net_path.parent
     lib_name   = args.lib
     outputs: list = []
@@ -156,6 +221,7 @@ def main():
     print("  net2ads pipeline")
     print(f"  netlist    : {net_path.name}")
     print(f"  library    : {lib_name}")
+    print(f"  pdk        : {pdk_name or '(none — default ADS libs)'}")
     print(f"  output dir : {output_dir}")
     print(f"  dry-run    : {dry_run}")
     print("=" * 66)
@@ -198,16 +264,22 @@ def main():
     print(f"  backbone  : {ir.graph.backbone}")
     print(f"  written   : {ir_path}")
 
-    if ir.phase_required > 1:
+    if ir.phase_required == 2 and not pdk_name:
         errors.append(
-            f"Netlist requires Phase {ir.phase_required} elements "
-            f"(TLIN/SW) — only passive R/L/C are fully supported."
+            f"Netlist has TLIN elements (Phase 2). Use --pdk to map them to a PDK "
+            "microstrip component, or run without --pdk to use ideal TLIN (UNCONFIRMED)."
+        )
+    elif ir.phase_required > 2:
+        errors.append(
+            f"Netlist requires Phase {ir.phase_required} elements (SW) — not yet supported."
         )
 
     # ── Stage 3: Map to build plan ────────────────────────────────────────────
     print("\n[Stage 3] Mapping IR to ADS build plan...")
     try:
         config  = load_mapping_config(MAPPING_CONFIG)
+        if pdk_name:
+            _enable_pdk_override(config, pdk_name)
         plan_bp = map_ir_to_buildplan(ir, config)
     except Exception as exc:
         _status("failed", 1, outputs, "Fix mapping error and retry.", str(exc))
@@ -260,7 +332,7 @@ def main():
     print("\n[Stage 5] Building ADS cell...")
 
     from ads_api.ads_session   import get_ads_session
-    from ads_api.workspace_ops import open_workspace
+    from ads_api.workspace_ops import open_workspace, open_workspace_with_pdk
     from ads_api.cell_ops      import open_or_create_schematic, save_design, commit_design
     from ads_api.schematic_ops import place_port, place_instance, connect
     from ads_api.symbol_ops    import create_dual_symbol
@@ -268,11 +340,22 @@ def main():
     try:
         session  = get_ads_session()
         ws_path  = Path(args.workspace).resolve()
-        _setup_workspace_files(ws_path, lib_name)
-        open_workspace(session, str(ws_path))
+
+        if pdk_name and pdk_lib_defs:
+            # PDK workspace: pre-write lib.defs with PDK include, then open
+            open_workspace_with_pdk(
+                session, str(ws_path), str(pdk_lib_defs), lib_name
+            )
+        else:
+            # Standard workspace (Phase 1 pattern)
+            _setup_workspace_files(ws_path, lib_name)
+            open_workspace(session, str(ws_path))
+
         lib = session.de.get_open_library(lib_name)
         print(f"  [ads] workspace: {ws_path}")
         print(f"  [ads] library  : {lib_name}")
+        if pdk_name:
+            print(f"  [ads] PDK      : {pdk_name}")
     except Exception as exc:
         _status("partial", 3, outputs,
                 "Fix ADS session / workspace setup and retry.", str(exc))

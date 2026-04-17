@@ -1,0 +1,57 @@
+cell_name: TWO_QW_TLINES
+source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\two_quarter_wave_lines\two_quarter_wave_lines_research.net
+generation_timestamp: '2026-04-17T00:59:37'
+ports:
+- name: P1
+  node: P1
+  number: 1
+  x: 1.375
+  y: 0.0
+- name: P2
+  node: P2
+  number: 2
+  x: 5.875
+  y: 0.0
+instances:
+- id: TL1
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: PP1029_mlin
+  ads_view: symbol
+  x: 2.875
+  y: 0.0
+  angle: 0.0
+  params:
+    W: 73.70 um
+    L: 2584.33 um
+  role: tline
+- id: TL2
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: PP1029_mlin
+  ads_view: symbol
+  x: 4.875
+  y: 0.0
+  angle: 0.0
+  params:
+    W: 29.27 um
+    L: 2665.48 um
+  role: tline
+wires:
+- id: wire_0
+  points:
+  - !!python/tuple
+    - 3.875
+    - 0.0
+  - !!python/tuple
+    - 4.875
+    - 0.0
+  note: 'net ''N_MID'': (3.875,0.0)->(4.875,0.0)'
+- id: wire_1
+  points:
+  - !!python/tuple
+    - 1.375
+    - 0.0
+  - !!python/tuple
+    - 2.875
+    - 0.0
+  note: 'net ''P1'': (1.375,0.0)->(2.875,0.0)'
+warnings: []
