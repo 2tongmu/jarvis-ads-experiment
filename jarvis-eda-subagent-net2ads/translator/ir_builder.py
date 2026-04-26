@@ -96,6 +96,7 @@ class IR:
     components: list            # list of IRComponent
     graph: IRGraph
     metadata: IRMetadata
+    design_variables: list      # list of (name, value_string) from .VAR declarations
 
 
 @dataclass
@@ -245,10 +246,18 @@ def build_ir(parse_result: ParseResult) -> IR:
         end_node   = ports[1].node
         backbone_nodes, backbone_comps = _trace_backbone(adj, start_node, end_node)
         if not backbone_nodes:
-            warnings.append(
-                f"[WARN] Could not trace backbone from '{start_node}' to '{end_node}'. "
-                "Check that series components connect port 1 to port 2."
-            )
+            if len(ports) >= 3:
+                # 3-port topology (e.g. SPDT switch): backbone trace not applicable.
+                # The SPDT placement path handles multi-port routing independently.
+                warnings.append(
+                    f"[INFO] Backbone trace skipped for {len(ports)}-port topology "
+                    f"('{start_node}' -> '{end_node}'). Expected for SPDT circuits."
+                )
+            else:
+                warnings.append(
+                    f"[WARN] Could not trace backbone from '{start_node}' to '{end_node}'. "
+                    "Check that series components connect port 1 to port 2."
+                )
 
     # ── Graph: shunt branches ─────────────────────────────────────────────────
     shunt_branches = []
@@ -306,6 +315,7 @@ def build_ir(parse_result: ParseResult) -> IR:
         components=ir_components,
         graph=graph,
         metadata=metadata,
+        design_variables=list(parse_result.design_variables),
     )
 
 
@@ -358,6 +368,9 @@ def _ir_to_dict(ir: IR) -> dict:
             "tline_count": ir.metadata.tline_count,
             "switch_count": ir.metadata.switch_count,
         },
+        "design_variables": [
+            {"name": name, "value": val} for name, val in ir.design_variables
+        ],
     }
 
 

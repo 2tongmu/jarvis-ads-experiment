@@ -1,6 +1,6 @@
 cell_name: TWO_QW_TLINES
 source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\two_quarter_wave_lines\two_quarter_wave_lines_research.net
-parse_timestamp: '2026-04-17T00:59:37'
+parse_timestamp: '2026-04-26T15:24:04'
 phase_required: 2
 ports:
 - name: P1
@@ -60,3 +60,4 @@ metadata:
   shunt_count: 0
   tline_count: 2
   switch_count: 0
+design_variables: []

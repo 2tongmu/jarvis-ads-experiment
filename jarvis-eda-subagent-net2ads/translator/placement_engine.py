@@ -114,6 +114,15 @@ class PlacementPlan:
     warnings: list
 
 
+# ── SPDT layout constants (from WIN_PP1029_core.yaml confirmed pin offsets) ────
+PATH_A_Y          =  2.0   # Path A signal rail y
+PATH_B_Y          = -2.0   # Path B signal rail y
+FET_SERIES_ORIGIN_DY = -0.5  # series FET origin below signal rail (angle=90)
+FET_SHUNT_ORIGIN_DY  = -0.5  # shunt FET origin below signal rail (angle=0)
+FETBIAS_Y_BELOW_GATE = 1.5   # fetbias placed 1.5 units below FET gate
+VCTRL_Y_BELOW_GATE   = 3.0   # VCTRL port placed 3.0 units below FET gate
+
+
 # ── Angle assignment ───────────────────────────────────────────────────────────
 
 def _angle_for(inst: BuildInstance) -> float:
@@ -124,7 +133,400 @@ def _angle_for(inst: BuildInstance) -> float:
         return ANGLE_SHUNT
     if inst.role == "tline":
         return ANGLE_TLINE
+    if inst.role == "fet_series":
+        return 90.0    # drain left, source right, gate below — WIN_PP1029_core.yaml
+    if inst.role == "fet_shunt":
+        return 0.0     # drain at signal tap, source down — WIN_PP1029_core.yaml
+    if inst.role == "fetbias":
+        return 0.0     # VCTRL left, GATE right
     return ANGLE_SERIES   # series, switch (ON=R), default
+
+
+def _is_spdt_topology(build_plan: BuildPlan) -> bool:
+    """Return True if this build plan describes a 3-port SPDT with FET elements."""
+    has_fets = any(i.role in ("fet_series", "fet_shunt") for i in build_plan.instances)
+    has_3_rf_ports = sum(
+        1 for p in build_plan.ports
+        if not p.name.startswith("VCTRL")
+    ) >= 3
+    return has_fets and has_3_rf_ports
+
+
+def _partition_spdt_paths(
+    build_plan: BuildPlan,
+) -> tuple:
+    """
+    Partition non-FET/non-fetbias instances into (common, path_a, path_b) by
+    BFS from each RF output port (P2=path_a, P3=path_b).
+
+    Returns:
+        common_insts   : list[BuildInstance] — P1 → branch point
+        path_a_insts   : list[BuildInstance] — branch → P2 (series + shunts)
+        path_b_insts   : list[BuildInstance] — branch → P3 (series + shunts)
+        path_a_shunts  : list[BuildInstance] — shunt branches on Path A
+        path_b_shunts  : list[BuildInstance] — shunt branches on Path B
+    """
+    # RF ports: P1, P2, P3 (exclude VCTRL ports)
+    rf_ports = [p for p in build_plan.ports if not p.name.startswith("VCTRL")]
+    port_by_number = {p.number: p for p in rf_ports}
+    p1_node = port_by_number.get(1, rf_ports[0]).node if rf_ports else None
+    p2_node = port_by_number.get(2, rf_ports[1]).node if len(rf_ports) > 1 else None
+    p3_node = port_by_number.get(3, rf_ports[2]).node if len(rf_ports) > 2 else None
+
+    # Only partition regular instances (R, L, C, switch-role) — not FETs/fetbias
+    regular = [
+        i for i in build_plan.instances
+        if i.role in ("series", "shunt", "switch", "gnd")
+    ]
+
+    # Build adjacency for series/switch instances AND fet_shunt FETs (for path tracing).
+    # fet_shunt is included so that shunt termination resistors behind them
+    # (e.g. RTERM_A behind Q_SW_SHUNT_A via N_A3→N_AST) are reachable from the
+    # output ports when checking shunt tap nodes.
+    # fet_series is NOT included: traversing through series FETs would absorb the
+    # common input section (P1→N_COM) into Path A, breaking the path partition.
+    traversal_insts = regular + [
+        i for i in build_plan.instances
+        if i.role == "fet_shunt"
+    ]
+    adj: dict = {}
+    for inst in traversal_insts:
+        if inst.role in ("series", "switch", "fet_shunt") and len(inst.nodes) >= 2:
+            n0, n1 = inst.nodes[0], inst.nodes[1]
+            adj.setdefault(n0, []).append((inst, n1))
+            adj.setdefault(n1, []).append((inst, n0))
+
+    def _reachable_from(start_node: str, exclude_nodes: set) -> tuple:
+        """
+        BFS from start_node (excluding certain nodes).
+        Returns (visited_inst_ids: set, visited_nodes: set).
+        visited_inst_ids includes series/FET IDs traversed.
+        visited_nodes is used to classify shunt components by their tap node.
+        """
+        from collections import deque
+        visited_nodes = {start_node}
+        visited_insts = set()
+        queue = deque([start_node])
+        while queue:
+            node = queue.popleft()
+            for inst, neighbor in adj.get(node, []):
+                if neighbor not in exclude_nodes and neighbor not in visited_nodes:
+                    visited_nodes.add(neighbor)
+                    visited_insts.add(inst.id)
+                    queue.append(neighbor)
+                elif inst.id not in visited_insts and node not in exclude_nodes:
+                    visited_insts.add(inst.id)
+        return visited_insts, visited_nodes
+
+    # Path A = reachable from P2, not going through P1 or P3
+    path_a_ids, path_a_nodes = _reachable_from(p2_node, {p1_node, p3_node}) if p2_node else (set(), set())
+    # Path B = reachable from P3, not going through P1 or P2
+    path_b_ids, path_b_nodes = _reachable_from(p3_node, {p1_node, p2_node}) if p3_node else (set(), set())
+
+    def _shunt_tap(inst) -> str:
+        """Return the non-ground tap node of a shunt instance."""
+        return next((n for n in inst.nodes if not _is_ground_node(n)), inst.nodes[0] if inst.nodes else "")
+
+    common_insts = []
+    path_a_series, path_a_shunts = [], []
+    path_b_series, path_b_shunts = [], []
+
+    for inst in regular:
+        if inst.role == "gnd":
+            continue  # handled separately via companion shunt
+        if inst.role == "shunt":
+            # Classify shunt by its tap node — the non-ground node must be
+            # reachable from the output port (not just traversed as a series inst).
+            tap = _shunt_tap(inst)
+            if tap in path_a_nodes:
+                path_a_shunts.append(inst)
+            elif tap in path_b_nodes:
+                path_b_shunts.append(inst)
+            else:
+                common_insts.append(inst)
+        else:
+            in_a = inst.id in path_a_ids
+            in_b = inst.id in path_b_ids
+            if in_a:
+                path_a_series.append(inst)
+            elif in_b:
+                path_b_series.append(inst)
+            else:
+                common_insts.append(inst)
+
+    return common_insts, path_a_series, path_a_shunts, path_b_series, path_b_shunts
+
+
+def _assign_spdt_coordinates(
+    build_plan: BuildPlan,
+    warnings: list,
+) -> tuple:
+    """
+    Compute placement for a 3-port SPDT with PDK FETs and fetbias subcells.
+
+    Layout:
+      y=0: common section (P1 → N_COM)
+      y=+PATH_A_Y: Path A signal rail (N_COM → P2)
+      y=-PATH_B_Y: Path B signal rail (N_COM → P3)
+
+    FET placement (from WIN_PP1029_core.yaml placement_recipes):
+      series FET angle=90: origin=(x_drain+0.5, path_y-0.5), gate=(x_drain+0.5, path_y-0.5)
+      shunt FET  angle=0:  origin=(node_x-0.5,  path_y-0.5), gate=(node_x-0.5,  path_y-0.5)
+
+    fetbias placed below FET gate:  (gate_x, gate_y - FETBIAS_Y_BELOW_GATE)
+    VCTRL port placed below fetbias: (gate_x, gate_y - VCTRL_Y_BELOW_GATE)
+    """
+    rf_ports = [p for p in build_plan.ports if not p.name.startswith("VCTRL")]
+    vctrl_ports = [p for p in build_plan.ports if p.name.startswith("VCTRL")]
+    port_by_number = {p.number: p for p in rf_ports}
+
+    (common_insts, path_a_series, path_a_shunts,
+     path_b_series, path_b_shunts) = _partition_spdt_paths(build_plan)
+
+    placed_instances: list = []
+    placed_ports: list = []
+
+    # ── Common section layout (y=0) ───────────────────────────────────────────
+    x = FIRST_SHUNT_X
+    common_node_x: dict = {}
+    p1_node = port_by_number.get(1, rf_ports[0]).node if rf_ports else None
+    if p1_node:
+        common_node_x[p1_node] = PORT_LEFT_X
+    for inst in common_insts:
+        common_node_x[inst.nodes[0]] = x
+        placed_instances.append(PlacedInstance(
+            id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
+            ads_view=inst.ads_view, x=round(x, 4), y=SIGNAL_Y,
+            angle=_angle_for(inst), params=inst.params, role=inst.role,
+        ))
+        x += COMPONENT_SPACING
+    branch_x = x - COMPONENT_SPACING + COMP_WIDTH  # x of N_COM node
+
+    # ── Path layout helper ────────────────────────────────────────────────────
+    def _layout_path(
+        series_insts, shunt_insts, fet_insts, path_y, port_node,
+    ):
+        """Layout one SPDT path at given path_y. Returns placed items + end_x."""
+        placed = []
+        node_x = {}
+        px = branch_x + COMPONENT_SPACING
+
+        for inst in series_insts:
+            # Distinguish FET from passive based on companion FET lookup
+            node_x[inst.nodes[0]] = px
+            placed.append(PlacedInstance(
+                id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
+                ads_view=inst.ads_view, x=round(px, 4), y=round(path_y, 4),
+                angle=_angle_for(inst), params=inst.params, role=inst.role,
+            ))
+            node_x[inst.nodes[1]] = px + COMP_WIDTH
+            px += COMPONENT_SPACING
+
+        # Shunts: placed at tap node x on signal path
+        for inst in shunt_insts:
+            tap = next((n for n in inst.nodes if not _is_ground_node(n)), None)
+            sx = node_x.get(tap, px - COMP_WIDTH)
+            placed.append(PlacedInstance(
+                id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
+                ads_view=inst.ads_view, x=round(sx, 4), y=round(path_y, 4),
+                angle=ANGLE_SHUNT, params=inst.params, role=inst.role,
+            ))
+            # GND companion
+            gnd_id = f"GND_{inst.id}"
+            gnd = next((i for i in build_plan.instances if i.id == gnd_id), None)
+            if gnd:
+                placed.append(PlacedInstance(
+                    id=gnd.id, ads_lib=gnd.ads_lib, ads_cell=gnd.ads_cell,
+                    ads_view=gnd.ads_view, x=round(sx, 4),
+                    y=round(path_y + GND_Y, 4),
+                    angle=ANGLE_GND, params=gnd.params, role=gnd.role,
+                ))
+
+        # FET instances on this path
+        for inst in fet_insts:
+            if inst.role == "fet_series":
+                # Find x from drain node — look up x of entry node
+                entry_node = inst.nodes[0] if inst.nodes else None
+                x_drain = node_x.get(entry_node, branch_x + COMPONENT_SPACING)
+                origin_x = x_drain + 0.5
+                origin_y = path_y + FET_SERIES_ORIGIN_DY
+            else:  # fet_shunt
+                tap_node = inst.nodes[0] if inst.nodes else None
+                x_tap = node_x.get(tap_node, px)
+                origin_x = x_tap - 0.5
+                origin_y = path_y + FET_SHUNT_ORIGIN_DY
+
+            placed.append(PlacedInstance(
+                id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
+                ads_view=inst.ads_view, x=round(origin_x, 4), y=round(origin_y, 4),
+                angle=_angle_for(inst), params=inst.params, role=inst.role,
+            ))
+
+        end_x = px - COMPONENT_SPACING + COMP_WIDTH
+        return placed, end_x, node_x
+
+    # ── Classify FETs by path ─────────────────────────────────────────────────
+    fet_insts = [i for i in build_plan.instances if i.role in ("fet_series", "fet_shunt")]
+    path_a_ids = {i.id for i in path_a_series + path_a_shunts}
+    path_b_ids = {i.id for i in path_b_series + path_b_shunts}
+
+    # FET path assignment: FET's nodes[0] (entry) matches the series/shunt component
+    # it replaced. Walk back via the sw_map naming: Q_SW_SERIES_A → SW_SERIES_A.
+    fet_a, fet_b = [], []
+    for inst in fet_insts:
+        sw_name = inst.id.replace("Q_", "", 1)  # Q_SW_SERIES_A → SW_SERIES_A
+        # Check if any path_a component shares the same nodes
+        found_a = any(
+            set(s.nodes) & set(inst.nodes)
+            for s in path_a_series + path_a_shunts
+        )
+        found_b = any(
+            set(s.nodes) & set(inst.nodes)
+            for s in path_b_series + path_b_shunts
+        )
+        if found_a:
+            fet_a.append(inst)
+        elif found_b:
+            fet_b.append(inst)
+        else:
+            # Fallback: name-based heuristic (_A suffix → path A, _B → path B)
+            if sw_name.endswith("_A"):
+                fet_a.append(inst)
+            elif sw_name.endswith("_B"):
+                fet_b.append(inst)
+            else:
+                warnings.append(f"[WARN] FET '{inst.id}': cannot assign to path A or B — using path A")
+                fet_a.append(inst)
+
+    p2_node = port_by_number.get(2, None)
+    p3_node = port_by_number.get(3, None)
+
+    placed_a, end_x_a, node_x_a = _layout_path(
+        path_a_series, path_a_shunts, fet_a, PATH_A_Y,
+        p2_node.node if p2_node else None,
+    )
+    placed_b, end_x_b, node_x_b = _layout_path(
+        path_b_series, path_b_shunts, fet_b, PATH_B_Y,
+        p3_node.node if p3_node else None,
+    )
+    placed_instances.extend(placed_a)
+    placed_instances.extend(placed_b)
+
+    # ── fetbias instances — placed below their FET gate ───────────────────────
+    fet_pos = {pi.id: pi for pi in placed_instances if pi.role in ("fet_series", "fet_shunt")}
+
+    fetbias_insts = [i for i in build_plan.instances if i.role == "fetbias"]
+    vctrl_port_map = {p.name: p for p in vctrl_ports}  # VCTRL_SW_SERIES_A → BuildPort
+
+    for inst in fetbias_insts:
+        # BIAS_SW_SERIES_A → Q_SW_SERIES_A
+        fet_id = inst.id.replace("BIAS_", "Q_", 1)
+        fet_pi = fet_pos.get(fet_id)
+        if fet_pi:
+            gate_x = fet_pi.x   # FET origin = gate position for both angle=90 and 0
+            gate_y = fet_pi.y
+        else:
+            warnings.append(f"[WARN] fetbias '{inst.id}': no matching FET '{fet_id}' found")
+            gate_x, gate_y = FIRST_SHUNT_X, SIGNAL_Y
+
+        bias_x = gate_x
+        bias_y = gate_y - FETBIAS_Y_BELOW_GATE
+        placed_instances.append(PlacedInstance(
+            id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
+            ads_view=inst.ads_view, x=round(bias_x, 4), y=round(bias_y, 4),
+            angle=0.0, params=inst.params, role=inst.role,
+        ))
+
+        # VCTRL port placed below fetbias
+        vctrl_name = inst.nodes[0] if inst.nodes else None  # VCTRL_SW_SERIES_A
+        vctrl_port = vctrl_port_map.get(vctrl_name)
+        if vctrl_port:
+            placed_ports.append(PlacedPort(
+                name=vctrl_port.name, node=vctrl_port.node, number=vctrl_port.number,
+                x=round(bias_x - 0.5, 4), y=round(gate_y - VCTRL_Y_BELOW_GATE, 4),
+            ))
+
+    # ── RF port positions ─────────────────────────────────────────────────────
+    placed_ports.insert(0, PlacedPort(
+        name=port_by_number[1].name, node=port_by_number[1].node, number=1,
+        x=PORT_LEFT_X, y=SIGNAL_Y,
+    ))
+    if p2_node:
+        placed_ports.insert(1, PlacedPort(
+            name=p2_node.name, node=p2_node.node, number=2,
+            x=round(end_x_a, 4), y=round(PATH_A_Y, 4),
+        ))
+    if p3_node:
+        placed_ports.insert(2, PlacedPort(
+            name=p3_node.name, node=p3_node.node, number=3,
+            x=round(end_x_b, 4), y=round(PATH_B_Y, 4),
+        ))
+
+    # ── Wire routing — simplified: one wire per net on each path rail ─────────
+    placed_wires = _route_spdt_wires(
+        build_plan, placed_instances, placed_ports, common_insts,
+        path_a_series, path_b_series, PATH_A_Y, PATH_B_Y, branch_x,
+    )
+
+    return placed_ports, placed_instances, placed_wires
+
+
+def _route_spdt_wires(
+    build_plan, placed_instances, placed_ports,
+    common_insts, path_a_series, path_b_series,
+    path_a_y, path_b_y, branch_x,
+) -> list:
+    """
+    Generate wire segments for the SPDT schematic.
+    One horizontal segment per net on each rail (common at y=0, paths at path_y).
+    Excludes gate/bias internal nets (those are wired by schematic_ops).
+    """
+    # Build {net_name: {y_level: [x positions]}} from ports and placed instances
+    net_xs_by_y: dict = {}
+
+    inst_map = {pi.id: pi for pi in placed_instances}
+    port_map = {pp.name: pp for pp in placed_ports}
+
+    for port in placed_ports:
+        if port.name.startswith("VCTRL"):
+            continue  # bias control ports — no signal wire
+        net_xs_by_y.setdefault(port.node, {}).setdefault(port.y, set()).add(round(port.x, 6))
+
+    for bi in build_plan.instances:
+        pi = inst_map.get(bi.id)
+        if pi is None or bi.role in ("gnd", "fetbias", "fet_series", "fet_shunt"):
+            continue  # FET/fetbias wiring handled by schematic_ops
+        if bi.role in ("series", "switch") and len(bi.nodes) >= 2:
+            n0, n1 = bi.nodes[0], bi.nodes[1]
+            if not _is_ground_node(n0):
+                net_xs_by_y.setdefault(n0, {}).setdefault(pi.y, set()).add(round(pi.x, 6))
+            if not _is_ground_node(n1):
+                net_xs_by_y.setdefault(n1, {}).setdefault(pi.y, set()).add(round(pi.x + COMP_WIDTH, 6))
+        elif bi.role == "shunt":
+            tap = next((n for n in bi.nodes if not _is_ground_node(n)), None)
+            if tap:
+                net_xs_by_y.setdefault(tap, {}).setdefault(pi.y, set()).add(round(pi.x, 6))
+
+    wires = []
+    wire_idx = 0
+    for node_name, y_map in sorted(net_xs_by_y.items()):
+        for y_level, xs in sorted(y_map.items()):
+            xs_sorted = sorted(xs)
+            x1, x2 = xs_sorted[0], xs_sorted[-1]
+            if abs(x2 - x1) < 1e-9:
+                continue
+            wires.append(PlacedWire(
+                id=f"wire_{wire_idx}",
+                points=[(round(x1, 4), round(y_level, 4)),
+                        (round(x2, 4), round(y_level, 4))],
+                note=f"net '{node_name}' y={y_level}",
+            ))
+            wire_idx += 1
+
+    return wires
+
+
+# ── Angle assignment ──────────────────────────────────────────────────────���────
 
 
 # ── Backbone ordering ──────────────────────────────────────────────────────────
@@ -424,9 +826,15 @@ def compute_placement(build_plan: BuildPlan) -> PlacementPlan:
     """
     Compute full placement plan from a BuildPlan.
     Returns a PlacementPlan with coordinates for every component and wire.
+    Dispatches to SPDT-specific layout when FET elements are present.
     """
     warnings = list(build_plan.warnings)
-    placed_ports, placed_instances, placed_wires = _assign_coordinates(build_plan, warnings)
+    if _is_spdt_topology(build_plan):
+        placed_ports, placed_instances, placed_wires = _assign_spdt_coordinates(
+            build_plan, warnings
+        )
+    else:
+        placed_ports, placed_instances, placed_wires = _assign_coordinates(build_plan, warnings)
 
     return PlacementPlan(
         cell_name=build_plan.cell_name,

@@ -1,6 +1,6 @@
 cell_name: RC_SERIES_SHUNT
 source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\rc_series_shunt\rc_series_shunt_research.net
-parse_timestamp: '2026-04-15T21:48:03'
+parse_timestamp: '2026-04-26T15:23:44'
 phase_required: 1
 ports:
 - name: P1
@@ -67,3 +67,4 @@ metadata:
   shunt_count: 1
   tline_count: 0
   switch_count: 0
+design_variables: []

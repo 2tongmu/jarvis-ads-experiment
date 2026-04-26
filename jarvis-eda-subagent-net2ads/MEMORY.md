@@ -9,9 +9,9 @@ Updated by the agent during runs. Human-editable for corrections.
 
 | Phase | Status | Date | Sign-off |
 |---|---|---|---|
-| Phase 1 (R/L/C passive) | 🔵 Active — implementation in progress | 2026-04-13 | — |
-| Phase 2 (TLIN + PDK) | ⏳ Planned | — | — |
-| Phase 3 (SW / SPDT) | ⏳ Planned | — | — |
+| Phase 1 (R/L/C passive) | ✅ Complete | 2026-04-13 | — |
+| Phase 2 (TLIN + PDK) | ✅ Complete | 2026-04-26 | Ertong (ADS GUI) — see C:\Github_folders\jarvis-ads-experiment\PHASE2_SIGN_OFF.md |
+| Phase 3 (SW / SPDT) | 🔵 Active — next | — | — |
 
 Phase advancement requires human sign-off in this table.
 Agent must not self-advance phases.
@@ -67,7 +67,7 @@ All confirmed on: ADS 2026 Update 1 (Jarvis machine)
 | Capacitor | `de.LCVName('ads_rflib','C','symbol')` | ✅ CONFIRMED |
 | Ground | `de.LCVName('ads_rflib','GROUND','symbol')` | ✅ CONFIRMED |
 | Inductor | `de.LCVName('ads_rflib','L','symbol')` | ✅ CONFIRMED — local test 2026-04-14/15, ADS 2026 Update 1; L param key = "L", place_inductor works |
-| TLIN | `de.LCVName('ads_rflib','TLIN','symbol')` | ⚠️ UNCONFIRMED — Phase 2 item |
+| TLIN (PDK) | `de.LCVName('WIN_PP1029_DESIGN_KIT','PP1029_mlin','symbol')` | ✅ CONFIRMED — Jarvis 2026-04-26; params W, L, Layer; ideal `ads_rflib:TLIN` not tested |
 
 ### Confirmed placement angles
 
@@ -109,7 +109,7 @@ relying on it in production builds.
 |---|---|---|---|
 | OI-01 | ~~Pin graphic not visible on schematic canvas~~ | ~~Medium~~ | RESOLVED 2026-04-14 — use `add_dot_for_pin((x,y))` + `add_pin(term, dot, angle)` after `add_term()`; confirmed locally on ADS 2026 Update 1 |
 | OI-02 | ~~Inductor (L) LCV name unconfirmed~~ | ~~High (Phase 1 blocker)~~ | RESOLVED 2026-04-15 — `ads_rflib:L:symbol` + `L` param key confirmed via full pipeline run (verify_phase1.py); reconfirm on Jarvis (Update1) before final sign-off |
-| OI-03 | TLIN ADS cell name and parameter names unconfirmed | High (Phase 2 blocker) | Agent — Phase 2 start |
+| OI-03 | ~~TLIN ADS cell name and parameter names unconfirmed~~ | ~~High (Phase 2 blocker)~~ | RESOLVED 2026-04-26 — PDK path: `WIN_PP1029_DESIGN_KIT:PP1029_mlin`, params W/L/Layer confirmed on Jarvis. Ideal `ads_rflib:TLIN` remains untested (not needed for PDK flow). |
 | OI-04 | SW element mapping for SPDT is resistive/capacitive placeholder only | Low (Phase 3 known) | Human — PDK FET substitution is future work |
 | OI-05 | `ads_schematic_ports_ic:iopin` not confirmed as usable for schematic pin graphics | Low | Deferred — investigate in Phase 1 |
 | OI-06 | Multi-shunt topology placement (>1 shunt component) not yet generalized | Medium | Phase 1 — only single-shunt circuits in scope initially |

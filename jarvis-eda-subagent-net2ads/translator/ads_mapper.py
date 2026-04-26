@@ -28,7 +28,7 @@ Usage:
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import datetime
 
 try:
@@ -91,6 +91,20 @@ def load_mapping_config(config_path: Path) -> dict:
         )
     with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def load_sw_map(sw_map_path: Path) -> Optional[List[dict]]:
+    """
+    Load spdt_switch_sw_map.yaml produced by fet_bias_preprocessor.py.
+    Returns list of sw_mapping dicts, or None if path not provided / not found.
+    """
+    if sw_map_path is None or not Path(sw_map_path).exists():
+        return None
+    if not _YAML_AVAILABLE:
+        return None
+    with open(sw_map_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return data.get("sw_mappings", [])
 
 
 def _get_component_map(config: dict) -> dict:
@@ -327,9 +341,80 @@ def _map_component(
     return instances
 
 
+# ── SW → PDK FET mapping ──────────────────────────────────────────────────────
+
+def _map_sw_to_fet(
+    ir_comp: IRComponent,
+    sw_entry: dict,
+    warnings: list,
+    next_port_number: list,  # mutable [int] counter
+) -> tuple:
+    """
+    Map one SW element to a FET instance + fetbias subcell + VCTRL port.
+
+    Returns (list[BuildInstance], BuildPort_or_None).
+    The VCTRL BuildPort is the exposed control pin on the parent cell.
+    """
+    ads_lib  = sw_entry["ads_lib"]
+    ads_cell = sw_entry["ads_cell"]
+    role     = sw_entry["role"]             # 'series' or 'shunt'
+    nof      = sw_entry["nof"]
+    ugw_um   = sw_entry["ugw_um"]
+    rs_ohm   = sw_entry["rs_ohm"]
+    cp_ff    = sw_entry["cp_ff"]
+
+    instances = []
+
+    # 1. FET instance (WIN_PP1029_CPW)
+    fet_role = "fet_series" if role == "series" else "fet_shunt"
+    instances.append(BuildInstance(
+        id=f"Q_{ir_comp.id}",
+        ads_lib=ads_lib,
+        ads_cell=ads_cell,
+        ads_view="symbol",
+        params={
+            "NOF": str(nof),
+            "UGW": f"{ugw_um:.0f} um",
+        },
+        role=fet_role,
+        nodes=ir_comp.nodes,
+        phase_required=3,
+        api_status="UNCONFIRMED",
+    ))
+
+    # 2. fetbias subcell instance
+    vctrl_net = f"VCTRL_{ir_comp.id}"
+    gate_net  = f"GATE_{ir_comp.id}"
+    instances.append(BuildInstance(
+        id=f"BIAS_{ir_comp.id}",
+        ads_lib="net2ads_lib",
+        ads_cell="fetbias_sw_gate",
+        ads_view="symbol",
+        params={
+            "Rs": f"{rs_ohm:.1f} Ohm",
+            "Cp": f"{cp_ff:.2f} fF",
+        },
+        role="fetbias",
+        nodes=[vctrl_net, gate_net],
+        phase_required=3,
+        api_status="UNCONFIRMED",
+    ))
+
+    # 3. VCTRL port — exposed on parent cell for external bias drive
+    vctrl_port = BuildPort(
+        name=vctrl_net,
+        node=vctrl_net,
+        number=next_port_number[0],
+    )
+    next_port_number[0] += 1
+
+    return instances, vctrl_port
+
+
 # ── Main mapper ────────────────────────────────────────────────────────────────
 
-def map_ir_to_buildplan(ir: IR, mapping_config: dict) -> BuildPlan:
+def map_ir_to_buildplan(ir: IR, mapping_config: dict,
+                        sw_map: Optional[list] = None) -> BuildPlan:
     """
     Translate an IR to an ADS build plan using the provided mapping config.
     Returns a BuildPlan ready for placement_engine.py.
@@ -337,6 +422,12 @@ def map_ir_to_buildplan(ir: IR, mapping_config: dict) -> BuildPlan:
     warnings = list(ir.metadata.warnings)  # carry forward IR warnings
     comp_map = _get_component_map(mapping_config)
     gnd_config = mapping_config.get("gnd_symbol", {})
+
+    # ── sw_map index: sw_name → FetMapping dict ───────────────────────────────
+    sw_map_index = {}
+    if sw_map:
+        for entry in sw_map:
+            sw_map_index[entry["sw_name"]] = entry
 
     # ── Ports → BuildPort ─────────────────────────────────────────────────────
     build_ports = [
@@ -346,15 +437,24 @@ def map_ir_to_buildplan(ir: IR, mapping_config: dict) -> BuildPlan:
 
     # ── Components → BuildInstance ────────────────────────────────────────────
     all_instances = []
+    vctrl_ports = []  # extra ports for VCTRL pins (one per SW)
+    next_vctrl = [len(ir.ports) + 1]  # mutable counter for port numbering
+
     for comp in ir.components:
-        mapped = _map_component(comp, comp_map, warnings, gnd_config)
-        all_instances.extend(mapped)
+        if comp.type == "SW" and comp.id in sw_map_index:
+            mapped, vctrl = _map_sw_to_fet(comp, sw_map_index[comp.id], warnings, next_vctrl)
+            all_instances.extend(mapped)
+            if vctrl:
+                vctrl_ports.append(vctrl)
+        else:
+            mapped = _map_component(comp, comp_map, warnings, gnd_config)
+            all_instances.extend(mapped)
+
+    build_ports.extend(vctrl_ports)
 
     # ── Design variables ──────────────────────────────────────────────────────
-    # Collect any parametric values (expressions referencing variables).
-    # For research netlists these are typically fixed values, not expressions.
-    # Design variables are left empty for Phase 1 (all values are literals).
-    design_variables = []
+    # Populated from .VAR declarations in the research netlist.
+    design_variables = list(ir.design_variables)
 
     return BuildPlan(
         cell_name=ir.cell_name,

@@ -78,6 +78,11 @@ def _parse_args():
                         "Enables pdk_override in ads_mapping.yaml so TLIN maps to the "
                         "PDK microstrip cell. PDK lib.defs must exist at "
                         "ads_pdk/<PDK_NAME>/lib.defs relative to the net2ads root.")
+    p.add_argument("--sw-map", default=None, metavar="SW_MAP_YAML",
+                   help="Path to SW annotation YAML produced by fet_bias_preprocessor.py "
+                        "(e.g. examples/spdt_switch/spdt_switch_sw_map.yaml). "
+                        "Enables Phase 3 FET substitution: SW elements map to "
+                        "WIN_PP1029_CPW FETs + fetbias_sw_gate subcells.")
     return p.parse_args()
 
 
@@ -229,7 +234,7 @@ def main():
     # ── Translator imports ────────────────────────────────────────────────────
     from translator.parser           import parse_research_netlist
     from translator.ir_builder       import build_ir, write_ir
-    from translator.ads_mapper       import map_ir_to_buildplan, write_buildplan, load_mapping_config
+    from translator.ads_mapper       import map_ir_to_buildplan, write_buildplan, load_mapping_config, load_sw_map
     from translator.placement_engine import compute_placement, write_placement
 
     # ── Stage 1: Parse ────────────────────────────────────────────────────────
@@ -269,9 +274,10 @@ def main():
             f"Netlist has TLIN elements (Phase 2). Use --pdk to map them to a PDK "
             "microstrip component, or run without --pdk to use ideal TLIN (UNCONFIRMED)."
         )
-    elif ir.phase_required > 2:
+    elif ir.phase_required > 2 and not args.sw_map:
         errors.append(
-            f"Netlist requires Phase {ir.phase_required} elements (SW) — not yet supported."
+            f"Netlist requires Phase {ir.phase_required} elements (SW). "
+            "Provide --sw-map to enable FET substitution."
         )
 
     # ── Stage 3: Map to build plan ────────────────────────────────────────────
@@ -280,7 +286,10 @@ def main():
         config  = load_mapping_config(MAPPING_CONFIG)
         if pdk_name:
             _enable_pdk_override(config, pdk_name)
-        plan_bp = map_ir_to_buildplan(ir, config)
+        sw_map_data = load_sw_map(Path(args.sw_map)) if args.sw_map else None
+        if sw_map_data:
+            print(f"  [sw_map] loaded {len(sw_map_data)} SW mappings from {args.sw_map}")
+        plan_bp = map_ir_to_buildplan(ir, config, sw_map=sw_map_data)
     except Exception as exc:
         _status("failed", 1, outputs, "Fix mapping error and retry.", str(exc))
         sys.exit(1)
@@ -312,7 +321,8 @@ def main():
         print(f"  wire     {wire.id}  {wire.points}  [{wire.note}]")
     for w in placement.warnings:
         print(f"  [warn] {w}")
-        errors.append(w)
+        if not w.startswith("[INFO]"):   # [INFO] messages are informational, not errors
+            errors.append(w)
     print(f"  written   : {pl_path}")
 
     if dry_run:
@@ -375,6 +385,11 @@ def main():
 
         for wire in placement.wires:
             connect(design, wire.points)
+
+        # Write design variables before commit (e.g. Rs, Cp for fetbias cell)
+        if plan_bp.design_variables:
+            design.cell.write_design_variables(plan_bp.design_variables)
+            print(f"  [design vars] {plan_bp.design_variables}")
 
         # CRITICAL FIX: Commit transaction to finalize all instances in OpenAccess.
         # Without this, instances are not registered in the database and will be

@@ -1,0 +1,55 @@
+cell_name: FETBIAS_SW_GATE
+source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
+parse_timestamp: '2026-04-26T10:28:41'
+phase_required: 1
+ports:
+- name: VCTRL
+  node: VCTRL
+  number: 1
+- name: GATE
+  node: GATE
+  number: 2
+nodes:
+- name: GATE
+  is_port: true
+  connects_to_ground: false
+- name: VCTRL
+  is_port: true
+  connects_to_ground: true
+components:
+- id: RS
+  type: R
+  nodes:
+  - VCTRL
+  - GATE
+  params:
+    R: Rs
+  role: series
+  phase_required: 1
+- id: CP
+  type: C
+  nodes:
+  - VCTRL
+  - '0'
+  params:
+    C: Cp
+  role: shunt
+  phase_required: 1
+graph:
+  backbone:
+  - VCTRL
+  - GATE
+  backbone_components:
+  - RS
+  shunt_branches:
+  - tap_node: VCTRL
+    component_id: CP
+  switch_arms: []
+metadata:
+  warnings: []
+  port_count: 2
+  component_count: 2
+  series_count: 1
+  shunt_count: 1
+  tline_count: 0
+  switch_count: 0

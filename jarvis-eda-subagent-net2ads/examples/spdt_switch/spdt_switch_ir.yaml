@@ -1,0 +1,209 @@
+cell_name: SPDT_SWITCH
+source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
+parse_timestamp: '2026-04-26T15:22:14'
+phase_required: 3
+ports:
+- name: P1
+  node: P1
+  number: 1
+- name: P2
+  node: P2
+  number: 2
+- name: P3
+  node: P3
+  number: 3
+nodes:
+- name: N_A1
+  is_port: false
+  connects_to_ground: false
+- name: N_A2
+  is_port: false
+  connects_to_ground: false
+- name: N_A3
+  is_port: false
+  connects_to_ground: false
+- name: N_AST
+  is_port: false
+  connects_to_ground: true
+- name: N_B1
+  is_port: false
+  connects_to_ground: false
+- name: N_B2
+  is_port: false
+  connects_to_ground: false
+- name: N_B3
+  is_port: false
+  connects_to_ground: false
+- name: N_BST
+  is_port: false
+  connects_to_ground: true
+- name: N_COM
+  is_port: false
+  connects_to_ground: false
+- name: N_IN
+  is_port: false
+  connects_to_ground: false
+- name: P1
+  is_port: true
+  connects_to_ground: false
+- name: P2
+  is_port: true
+  connects_to_ground: false
+- name: P3
+  is_port: true
+  connects_to_ground: false
+components:
+- id: RIN_PAD
+  type: R
+  nodes:
+  - P1
+  - N_IN
+  params:
+    R: 0.05 Ohm
+  role: series
+  phase_required: 1
+- id: LIN_PAD
+  type: L
+  nodes:
+  - N_IN
+  - N_COM
+  params:
+    L: 10 pH
+  role: series
+  phase_required: 1
+- id: SW_SERIES_A
+  type: SW
+  nodes:
+  - N_COM
+  - N_A1
+  params:
+    State: 'ON'
+  role: switch
+  phase_required: 3
+- id: RPATH_A
+  type: R
+  nodes:
+  - N_A1
+  - N_A2
+  params:
+    R: 0.10 Ohm
+  role: series
+  phase_required: 1
+- id: LPATH_A
+  type: L
+  nodes:
+  - N_A2
+  - N_A3
+  params:
+    L: 40 pH
+  role: series
+  phase_required: 1
+- id: SW_SHUNT_A
+  type: SW
+  nodes:
+  - N_A3
+  - N_AST
+  params:
+    State: 'OFF'
+  role: switch
+  phase_required: 3
+- id: RTERM_A
+  type: R
+  nodes:
+  - N_AST
+  - '0'
+  params:
+    R: 50 Ohm
+  role: shunt
+  phase_required: 1
+- id: ROUT_A
+  type: R
+  nodes:
+  - N_A3
+  - P2
+  params:
+    R: 0.05 Ohm
+  role: series
+  phase_required: 1
+- id: SW_SERIES_B
+  type: SW
+  nodes:
+  - N_COM
+  - N_B1
+  params:
+    State: 'OFF'
+  role: switch
+  phase_required: 3
+- id: RPATH_B
+  type: R
+  nodes:
+  - N_B1
+  - N_B2
+  params:
+    R: 0.10 Ohm
+  role: series
+  phase_required: 1
+- id: LPATH_B
+  type: L
+  nodes:
+  - N_B2
+  - N_B3
+  params:
+    L: 40 pH
+  role: series
+  phase_required: 1
+- id: SW_SHUNT_B
+  type: SW
+  nodes:
+  - N_B3
+  - N_BST
+  params:
+    State: 'ON'
+  role: switch
+  phase_required: 3
+- id: RTERM_B
+  type: R
+  nodes:
+  - N_BST
+  - '0'
+  params:
+    R: 50 Ohm
+  role: shunt
+  phase_required: 1
+- id: ROUT_B
+  type: R
+  nodes:
+  - N_B3
+  - P3
+  params:
+    R: 0.05 Ohm
+  role: series
+  phase_required: 1
+graph:
+  backbone: []
+  backbone_components: []
+  shunt_branches:
+  - tap_node: N_AST
+    component_id: RTERM_A
+  - tap_node: N_BST
+    component_id: RTERM_B
+  switch_arms:
+  - component_id: SW_SERIES_A
+    state: 'ON'
+  - component_id: SW_SHUNT_A
+    state: 'OFF'
+  - component_id: SW_SERIES_B
+    state: 'OFF'
+  - component_id: SW_SHUNT_B
+    state: 'ON'
+metadata:
+  warnings:
+  - '[INFO] Backbone trace skipped for 3-port topology (''P1'' -> ''P2''). Expected
+    for SPDT circuits.'
+  port_count: 3
+  component_count: 14
+  series_count: 8
+  shunt_count: 2
+  tline_count: 0
+  switch_count: 4
+design_variables: []

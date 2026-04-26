@@ -285,8 +285,12 @@ def place_instance(session: "ADSSession", design, inst) -> object:
     """
     Dispatch a PlacedInstance to the correct place_* function by inst.ads_cell.
 
-    Handles GND role first, then looks up the component type in the placer
-    registry. Raises ValueError for unknown types — the error message names
+    Dispatch order:
+      1. role == "gnd"                    → place_ground()
+      2. role in ("fet_series","fet_shunt") → _place_fet()      (Phase 3)
+      3. role == "fetbias"                → _place_fetbias()    (Phase 3)
+      4. ads_cell registry lookup         → passive/tline handler
+    Raises ValueError for unknown types — the error message names
     the exact function to update (_PASSIVE_PLACER_REGISTRY in schematic_ops.py).
 
     Args:
@@ -308,6 +312,15 @@ def place_instance(session: "ADSSession", design, inst) -> object:
     """
     if inst.role == "gnd":
         return place_ground(session, design, inst.id, x=inst.x, y=inst.y)
+
+    # Phase 3: role-based dispatch for FET and fetbias instances.
+    # These use their own placers rather than the ads_cell registry because
+    # they share a common placement pattern but have unconfirmed param key names.
+    if inst.role in ("fet_series", "fet_shunt"):
+        return _place_fet(session, design, inst)
+
+    if inst.role == "fetbias":
+        return _place_fetbias(session, design, inst)
 
     handler = _PASSIVE_PLACER_REGISTRY.get(inst.ads_cell)
     if handler is None:
@@ -387,6 +400,96 @@ def _place_pdk_tline(session: "ADSSession", design, inst) -> object:
 
 # Register Phase 2: PDK microstrip tline cell
 _PASSIVE_PLACER_REGISTRY["PP1029_mlin"] = _place_pdk_tline
+
+
+# ── Phase 3: PDK FET placer ───────────────────────────────────────────────────
+
+def _place_fet(session: "ADSSession", design, inst) -> object:
+    """
+    Place a PDK FET instance (e.g. WIN_PP1029_CPW) with NOF/UGW params.
+
+    Uses the confirmed design.add_instance() + inst.parameters[key].value pattern.
+    Parameters are set one by one with individual try/except — a missing param key
+    logs a warning but does not abort placement.
+
+    Angle conventions for SPDT layout (from WIN_PP1029_core.yaml):
+        series FET: angle=90.0  (drain left, source right, gate below at y-0.5)
+        shunt  FET: angle=0.0   (drain at signal tap, source down)
+
+    API status:
+        de.LCVName(ads_lib, ads_cell, "symbol")      ✅ CONFIRMED (same as PDK tline)
+        design.add_instance(lcv, (x,y), name, angle) ✅ CONFIRMED
+        inst.parameters[key].value = expr            ✅ CONFIRMED
+        Actual param keys for WIN_PP1029_CPW (NOF, UGW) — UNCONFIRMED (J3-04)
+    """
+    ads_inst = design.add_instance(
+        session.de.LCVName(inst.ads_lib, inst.ads_cell, inst.ads_view),  # ✅ CONFIRMED
+        (inst.x, inst.y),
+        name=inst.id,
+        angle=inst.angle,
+    )
+    set_ok = []
+    set_fail = []
+    for k, v in inst.params.items():
+        try:
+            ads_inst.parameters[k].value = v   # ✅ CONFIRMED pattern; keys UNCONFIRMED J3-04
+            set_ok.append(f"{k}={v}")
+        except (KeyError, AttributeError) as exc:
+            set_fail.append(f"{k}={v} ({exc})")
+
+    print(f"[fet] '{inst.id}' {inst.ads_lib}:{inst.ads_cell} "
+          f"@ ({inst.x}, {inst.y}) angle={inst.angle} role={inst.role}")
+    if set_ok:
+        print(f"  params set   : {', '.join(set_ok)}")
+    if set_fail:
+        print(f"  params FAILED: {', '.join(set_fail)}")
+        print(f"  NOTE: Probe actual FET param names via build_pdk_yaml.py (J3-04)")
+    return ads_inst
+
+
+# ── Phase 3: fetbias subcell placer ──────────────────────────────────────────
+
+def _place_fetbias(session: "ADSSession", design, inst) -> object:
+    """
+    Place a fetbias_sw_gate subcell and attempt Rs/Cp instance-level override.
+
+    The fetbias_sw_gate cell defines Rs and Cp as cell-level design variables
+    with defaults from the netlist (.VAR Rs 1000.0 Ohm, .VAR Cp 2272.73 fF).
+
+    Instance-level override via inst.parameters[key].value is attempted but
+    UNCONFIRMED (Jarvis handover item J3-01). If it fails, the cell defaults
+    are used — which are correct for the standard SW_SERIES role (160um FET).
+    Shunt FETs (100um) have slightly different Rs (1040.2 Ohm) — override
+    is needed there; fallback to defaults is a known approximation.
+
+    API status:
+        de.LCVName(ads_lib, ads_cell, "symbol")      ✅ CONFIRMED (same pattern)
+        design.add_instance(lcv, (x,y), name, angle) ✅ CONFIRMED
+        inst.parameters[key].value = expr            ⚠️ UNCONFIRMED for subcell design vars (J3-01)
+    """
+    ads_inst = design.add_instance(
+        session.de.LCVName(inst.ads_lib, inst.ads_cell, inst.ads_view),  # ✅ CONFIRMED
+        (inst.x, inst.y),
+        name=inst.id,
+        angle=inst.angle,
+    )
+    set_ok = []
+    set_fail = []
+    for k, v in inst.params.items():
+        try:
+            ads_inst.parameters[k].value = v   # ⚠️ UNCONFIRMED subcell var override (J3-01)
+            set_ok.append(f"{k}={v}")
+        except (KeyError, AttributeError) as exc:
+            set_fail.append(f"{k}={v} ({exc})")
+
+    print(f"[fetbias] '{inst.id}' {inst.ads_lib}:{inst.ads_cell} "
+          f"@ ({inst.x}, {inst.y}) angle={inst.angle}")
+    if set_ok:
+        print(f"  params set   : {', '.join(set_ok)}")
+    if set_fail:
+        print(f"  params FAILED: {', '.join(set_fail)}")
+        print(f"  NOTE: subcell design-var override unconfirmed (J3-01) — cell defaults used")
+    return ads_inst
 
 
 # ── Sub-circuit instances ──────────────────────────────────────────────────────

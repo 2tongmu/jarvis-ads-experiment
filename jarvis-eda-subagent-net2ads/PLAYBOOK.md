@@ -325,7 +325,7 @@ Do not report success to any orchestrator until the checker passes.
 
 ## Development Phases
 
-### Phase 1 — Passive Topology → ADS Schematic ✅ active
+### Phase 1 — Passive Topology → ADS Schematic ✅ complete
 
 **Target netlists:**
 - `rc_series_shunt_research.net`
@@ -333,42 +333,112 @@ Do not report success to any orchestrator until the checker passes.
 
 **Supported elements:** R, L, C
 **PDK required:** No — uses `ads_rflib` only
-**Success criteria:**
-- Generated schematic matches topology visually in ADS GUI
-- Port terms correctly created (v_ctrl / sw_gate style naming)
-- Checker passes for both netlists
-- Symbol view generated with correct pin count
 
-### Phase 2 — PDK-Aware Mapping ⏳ planned
+### Phase 2 — PDK-Aware Mapping ✅ complete (signed off 2026-04-26)
 
 **Target netlist:** `two_quarter_wave_lines_research.net`
+**Sign-off report:** `C:\Github_folders\jarvis-ads-experiment\PHASE2_SIGN_OFF.md`
 
-**Additions:**
-- `TLIN` element support in parser and IR
-- PDK mapping layer in `ads_mapper.py`
-- `ads_mapping.yaml` TLIN mapping block with configurable PDK override
-- `ads_rflib:TLIN` as default; WIN_PP1029 CPW TLine as optional override
+**Confirmed:** `WIN_PP1029_DESIGN_KIT:PP1029_mlin:symbol` — W, L, Layer params working on Jarvis.
 
-**Success criteria:**
-- TLIN mapped to correct ADS component per `ads_mapping.yaml`
-- Mapping is configurable without code changes
-- Checker passes
+### Phase 3 — SPDT Switch with PDK FETs + Gate Bias 🔵 active
 
-### Phase 3 — SPDT Switch Structure ⏳ planned
+**Target netlists:**
+- `examples/spdt_switch/spdt_switch_research.net` — main SPDT cell
+- `examples/spdt_switch/fetbias_sw_gate/fetbias_sw_gate_research.net` — bias subcell (generated)
 
-**Target netlist:** `spdt_switch_research.net`
+**Goal:** Simulation-ready 3-port SPDT schematic using real PDK FETs (WIN_PP1029_CPW) and
+gate bias subcells. Cell can be dropped into a 3-port S-param bench for verification.
 
-**Additions:**
-- `SW` element support in parser and IR
-- Switch state (`State=ON`/`State=OFF`) preserved in IR
-- ON-state: resistive model (R=0.1 Ohm)
-- OFF-state: capacitive model (C=30 fF) or shunt termination
-- 3-port cell support in placement engine
+---
 
-**Success criteria:**
-- 3-port schematic created with correct connectivity
-- Switch structure preserved topologically
-- Ready for nonlinear / PDK FET substitution in a future phase
+#### Phase 3 execution steps
+
+**Step 0 — Pre-processor** (`translator/fet_bias_preprocessor.py`)
+- Classifies SW elements as series or shunt from netlist topology
+- Looks up FET sizing from `WIN_PP1029_core.yaml` (series: NOF=2 UGW=80µm, shunt: NOF=2 UGW=50µm)
+- Calls `gate_bias_network.calculate_bias()` per FET size
+- Control voltages: on-state=0V, off-state=−1.5V (PP10 confirmed values)
+- Emits:
+  - `examples/spdt_switch/fetbias_sw_gate/fetbias_sw_gate_research.net`
+  - `examples/spdt_switch/spdt_switch_sw_map.yaml` (SW→FET annotation per instance)
+
+**fetbias_sw_gate cell topology:**
+```
+VCTRL ──[RS]──── GATE
+   |
+  [CP]
+   |
+  GND
+```
+RS and CP are ADS design variables (defaults = series FET calculated values).
+R component uses `R=Rs`, C component uses `C=Cp` to reference the variables.
+Shunt FET instances in SPDT override Rs/Cp at instance level.
+
+**Step 1 — Build `fetbias_sw_gate` ADS cell**
+Run net2ads on generated `fetbias_sw_gate_research.net` — Phase 1 elements only, no new code needed.
+Output: `net2ads_lib:fetbias_sw_gate:schematic+symbol`
+
+**Step 2 — Parser + IR updates**
+- `translator/parser.py`: SW element type, preserve `State=ON/OFF`
+- `translator/ir_builder.py`: 3-port handling, dual-path topology off N_COM
+
+**Step 3 — Mapper update**
+- `translator/ads_mapper.py`: SW → WIN_PP1029_CPW; consumes `spdt_switch_sw_map.yaml`
+- `schemas/ads_mapping.yaml`: SW mapping block
+- Build plan gains `fet_series` / `fet_shunt` roles with linked fetbias and VCTRL entries
+
+**Step 4 — Placement engine: 3-port SPDT geometry**
+```
+P1 (left) ──[common section]──┬── PATH A (y=+2.0) ── P2 (upper right)
+                               └── PATH B (y=−2.0) ── P3 (lower right)
+```
+- Series FET: angle=90 (drain left, source right, gate below) — from WIN_PP1029_core.yaml
+- Shunt FET: angle=0 (drain at signal tap, source down) — from WIN_PP1029_core.yaml
+- fetbias placed below each FET gate pin
+- VCTRL pins placed below each fetbias instance
+
+**Step 5 — Schematic ops updates** (`ads_api/schematic_ops.py`)
+- `_place_fet()`: WIN_PP1029_CPW with angle, NOF, UGW
+- `_place_fetbias()`: instantiates `net2ads_lib:fetbias_sw_gate`, attempts Rs/Cp instance override
+- VCTRL exposed as port pin on SPDT cell (no V_DC for now — local testing phase)
+- SPDT cell ports: P1, P2, P3 (RF) + VCTRL_SER_A, VCTRL_SHU_A, VCTRL_SER_B, VCTRL_SHU_B (control)
+
+---
+
+#### Design variable approach for fetbias
+
+One `fetbias_sw_gate` cell. Rs and Cp are design variables — same concept as R on a resistor.
+When SPDT instantiates it 4×, each instance overrides Rs/Cp for its FET size:
+- Series FETs (UGW=80µm): Rs/Cp = series-calculated values (also the cell defaults)
+- Shunt FETs (UGW=50µm): Rs/Cp = shunt-calculated values via `inst.parameters["Rs"].value`
+
+**Fallback** (if subcell parameter override unconfirmed locally): use series FET Rs/Cp for all 4
+instances. Document for Jarvis probe in Phase 3b.
+
+---
+
+#### Jarvis handover items (Phase 3b)
+
+| Item | What to probe | Blocked by |
+|---|---|---|
+| J3-01 | Confirm `inst.parameters["Rs"]` overrides design variable on subcell instance | Phase 3 local build |
+| J3-02 | V_DC component LCV (`ads_rflib:V_DC:symbol`?) + param name for voltage | Phase 3 local build |
+| J3-03 | Replace VCTRL pins with internal V_DC sources (0V on-state, −1.5V off-state) | J3-02 confirmed |
+| J3-04 | WIN_PP1029_CPW placement verification on real PDK workspace | Phase 3 local build |
+
+After J3-01 through J3-04: Phase 3 sign-off, then add ADS design variables to toggle state
+(single input drives all 4 control voltages via expression).
+
+---
+
+#### Success criteria
+
+- [ ] `fetbias_sw_gate` ADS cell: Vctrl→Rs→gate with Cp to GND, Rs/Cp as design variables
+- [ ] `spdt_switch` ADS cell: 3-port (P1/P2/P3) + 4 VCTRL pins, WIN_PP1029_CPW FETs, fetbias subcells
+- [ ] All intermediate artifacts written (sw_map.yaml, ir, buildplan, placement)
+- [ ] Dry-run passes stages 1–4 without errors
+- [ ] Jarvis: visual inspection in ADS GUI, PDK components resolve correctly
 
 ---
 

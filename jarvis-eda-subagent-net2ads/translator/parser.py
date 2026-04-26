@@ -12,6 +12,7 @@ Supported syntax:
     .SUBCKT <name> <port1> <port2> ... 0
     PORT:<name>  <node>
     <Type>:<InstanceName>  <node1>  <node2>  <param>=<value> ...
+    .VAR <name> <value> [<unit>]
     .ENDS <name>
 
 Unsupported constructs (logged as warnings, not errors):
@@ -82,6 +83,7 @@ class ParseResult:
     components: list                # list of ParsedComponent
     warnings: list                  # list of warning strings
     source_file: str
+    design_variables: list          # list of (name, value_string) from .VAR declarations
 
 
 # ── Unit normalization ─────────────────────────────────────────────────────────
@@ -203,6 +205,7 @@ def parse_research_netlist(path: Path) -> ParseResult:
     ports = []
     components = []
     warnings = []
+    design_variables = []
     in_subckt = False
 
     for lineno, raw_line in enumerate(lines, start=1):
@@ -246,6 +249,19 @@ def parse_research_netlist(path: Path) -> ParseResult:
             )
             continue
 
+        # .VAR declaration — design variable with default value
+        # Syntax: .VAR <name> <value> [<unit>]
+        # Example: .VAR Rs 1000.0 Ohm  or  .VAR Cp 2272.73 fF
+        if line_lower.startswith(".var"):
+            tokens = line.split(None, 3)  # .VAR name value [unit]
+            if len(tokens) >= 3:
+                var_name  = tokens[1]
+                var_value = " ".join(tokens[2:]).strip()
+                design_variables.append((var_name, var_value))
+            else:
+                warnings.append(f"[WARN] Line {lineno}: Malformed .VAR declaration — skipped: {line}")
+            continue
+
         # PORT: declaration
         if line_lower.startswith("port:"):
             m = re.match(r'^PORT:(\S+)\s+(\S+)', line, re.IGNORECASE)
@@ -282,6 +298,7 @@ def parse_research_netlist(path: Path) -> ParseResult:
         components=components,
         warnings=warnings,
         source_file=str(path),
+        design_variables=design_variables,
     )
 
 
