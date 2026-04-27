@@ -118,11 +118,14 @@ def _is_ground(node: str) -> bool:
 def _classify_role(comp: ParsedComponent) -> str:
     """
     Classify a component's topological role.
+      vsource — type is V (voltage source)
       shunt   — one node is ground (direct connection to "0")
       tline   — type is TLIN (regardless of node assignment)
       switch  — type is SW
       series  — all other cases (both nodes are signal nodes)
     """
+    if comp.type == "V":
+        return "vsource"
     if comp.type == "TLIN":
         return "tline"
     if comp.type == "SW":

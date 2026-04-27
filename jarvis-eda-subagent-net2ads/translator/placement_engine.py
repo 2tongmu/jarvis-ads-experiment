@@ -131,6 +131,8 @@ def _angle_for(inst: BuildInstance) -> float:
         return ANGLE_SHUNT
     if inst.role == "tline":
         return ANGLE_TLINE
+    if inst.role == "vsource":
+        return ANGLE_SERIES   # voltage source: horizontal (series orientation)
     if inst.role == "fet_series":
         return 90.0    # drain left, source right, gate below — WIN_PP1029_core.yaml
     if inst.role == "fet_shunt":
@@ -832,8 +834,9 @@ def _assign_coordinates(
     shunts     = [i for i in build_plan.instances if i.role == "shunt"]
     gnds       = [i for i in build_plan.instances if i.role == "gnd"]
     switches   = [i for i in build_plan.instances if i.role == "switch"]
+    vsources   = [i for i in build_plan.instances if i.role == "vsource"]
     series     = [i for i in build_plan.instances if i.role in ("series", "tline")]
-    all_series = series + switches
+    all_series = series + switches + vsources
 
     # ── Backbone order + signal-path node x-positions ─────────────────────────
     ordered_backbone, backbone_node_x = _build_backbone_order(build_plan)

@@ -274,6 +274,49 @@ def place_inductor(
     return inst
 
 
+def place_vsource(
+    session: ADSSession,
+    design,
+    name: str,
+    voltage: str,
+    x: float,
+    y: float,
+    angle: float = 0.0,
+):
+    """
+    Place an ads_sources:V_DC voltage source and set its Vdc parameter.
+
+    Used for gate bias control, power supplies, and biasing networks.
+    The V_DC cell has two terminals: positive (node 1) and negative (node 2, usually GND).
+
+    CONFIRMED: Verified from probe J3-02 (2026-04-27).
+    
+    Args:
+        session : ADSSession
+        design  : schematic design object (WRITE mode)
+        name    : instance name (e.g. "VGATE", "VBIAS")
+        voltage : voltage string with unit (e.g. "0 V", "-1.5 V") or design variable (e.g. "Vgate")
+        x, y    : placement origin in schematic units
+        angle   : 0.0 for horizontal (series), default
+
+    Returns:
+        voltage source instance
+
+    API status:
+        de.LCVName('ads_sources','V_DC','symbol')  ✅ CONFIRMED J3-02
+        inst.parameters["Vdc"].value = expr        ✅ CONFIRMED J3-02
+    """
+    inst = design.add_instance(
+        session.de.LCVName("ads_sources", "V_DC", "symbol"),  # ✅ CONFIRMED J3-02
+        (x, y),
+        name=name,
+        angle=angle,
+    )
+    inst.parameters["Vdc"].value = voltage   # ✅ CONFIRMED J3-02; key "Vdc"
+    print(f"[V_DC] '{name}' Vdc={voltage} at ({x}, {y}) angle={angle}")
+    return inst
+
+
 # ── Generic instance dispatch ─────────────────────────────────────────────────
 
 # Registry: ads_cell name -> (param_key, default_value, placer_function)
@@ -349,10 +392,17 @@ def _ph_C(session, design, inst):
                            x=inst.x, y=inst.y, angle=inst.angle)
 
 
-# Register all confirmed passive component types (Phase 1)
+def _ph_V_DC(session, design, inst):
+    return place_vsource(session, design, inst.id,
+                         voltage=inst.params.get("Vdc", "0 V"),
+                         x=inst.x, y=inst.y, angle=inst.angle)
+
+
+# Register all confirmed passive and source component types (Phase 1-3)
 _PASSIVE_PLACER_REGISTRY["R"] = _ph_R   # ✅ CONFIRMED
 _PASSIVE_PLACER_REGISTRY["L"] = _ph_L   # ✅ CONFIRMED 2026-04-15
 _PASSIVE_PLACER_REGISTRY["C"] = _ph_C   # ✅ CONFIRMED
+_PASSIVE_PLACER_REGISTRY["V_DC"] = _ph_V_DC   # ✅ CONFIRMED J3-02 (2026-04-27)
 
 
 # ── Phase 2: PDK transmission line placer ─────────────────────────────────────

@@ -41,7 +41,7 @@ from typing import Optional
 PHASE_BY_TYPE = {
     "R": 1, "L": 1, "C": 1,
     "TLIN": 2,
-    "SW": 3,
+    "SW": 3, "V": 3,  # V = voltage source (Phase 3 — gate control, biasing)
 }
 
 # Constructs that are valid in the research dialect but are simulation-only — skip them.

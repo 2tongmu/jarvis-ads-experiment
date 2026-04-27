@@ -274,11 +274,15 @@ def main():
             f"Netlist has TLIN elements (Phase 2). Use --pdk to map them to a PDK "
             "microstrip component, or run without --pdk to use ideal TLIN (UNCONFIRMED)."
         )
-    elif ir.phase_required > 2 and not args.sw_map:
-        errors.append(
-            f"Netlist requires Phase {ir.phase_required} elements (SW). "
-            "Provide --sw-map to enable FET substitution."
-        )
+    elif ir.phase_required > 2:
+        # Phase 3 can have V (voltage sources) or SW (switches).
+        # V elements don't require --sw-map, but SW elements do.
+        has_sw = any(c.type == "SW" for c in ir.components)
+        if has_sw and not args.sw_map:
+            errors.append(
+                f"Netlist has SW elements (Phase 3). "
+                "Provide --sw-map to enable FET substitution."
+            )
 
     # ── Stage 3: Map to build plan ────────────────────────────────────────────
     print("\n[Stage 3] Mapping IR to ADS build plan...")

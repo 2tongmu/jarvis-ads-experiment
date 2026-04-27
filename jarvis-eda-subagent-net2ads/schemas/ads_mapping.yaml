@@ -161,6 +161,25 @@ component_map:
         Shunt FET:  angle=0,  place at (node_x-0.5,  -0.5)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Phase 3 — Voltage source mapping (V)
+# ─────────────────────────────────────────────────────────────────────────────
+# Voltage sources (e.g., gate control for FETs) map to V_DC in ads_sources
+  - research_type: V
+    phase: 3
+    description: DC voltage source (gate control, bias, etc.)
+    ads_lib: ads_sources
+    ads_cell: V_DC
+    ads_view: symbol
+    api_status: "CONFIRMED"      # Confirmed J3-02 probe (2026-04-27)
+    param_map:
+      - research_param: Vdc
+        ads_param: Vdc
+        unit_passthrough: true   # pass value string as-is (e.g., "0 V", "-1.5 V", or design variable like "Vgate")
+    placement:
+      series_angle: 0.0          # horizontal in signal path
+      shunt_angle: -90.0         # vertical (though typically used as series)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Port → ADS term mapping
 # ─────────────────────────────────────────────────────────────────────────────
 port_mapping:
