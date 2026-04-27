@@ -22,6 +22,11 @@
 
 .SUBCKT FETBIAS_SW_GATE VCTRL GATE 0
 
+; -- Design variables ────────────────────────────────────────
+; Rs and Cp are parametric — set defaults, override per instance
+.VAR Rs 1000.0 Ohm
+.VAR Cp 2272.73 fF
+
 ; -- Ports -------------------------------------------------------
 PORT:VCTRL  VCTRL
 PORT:GATE   GATE
