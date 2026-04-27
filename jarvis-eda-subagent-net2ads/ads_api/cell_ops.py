@@ -188,13 +188,14 @@ def write_itemdef_ael(cell_dir_path, cell_name: str, design_variables: list) -> 
     has an itemdef.ael file.
 
     This function generates and writes the AEL file that registers design
-    variables as component parameters.
+    variables as component parameters. ALL design variables from the netlist
+    (.VAR declarations) are automatically included.
 
     Args:
         cell_dir_path     : path to the cell directory (e.g. C:\...\net2ads_lib\fetbias_sw_gate\)
         cell_name         : name of the cell (e.g. "fetbias_sw_gate")
         design_variables  : list of (var_name, var_value) tuples
-                            e.g. [("Rs", "1000.0 Ohm"), ("Cp", "2272.73 fF")]
+                            e.g. [("Vgate", "0.0 V"), ("Rs", "1000.0 Ohm"), ("Cp", "2272.73 fF")]
 
     API status:
         File I/O only — no ADS API involved (itemdef.ael is static text)
@@ -204,10 +205,11 @@ def write_itemdef_ael(cell_dir_path, cell_name: str, design_variables: list) -> 
     cell_dir = Path(cell_dir_path)
     itemdef_path = cell_dir / 'itemdef.ael'
     
-    # Build parameter declarations
+    # Build parameter declarations from ALL design variables
     parm_list = []
     for var_name, var_value in design_variables:
         # Extract the numeric part and convert to scientific notation
+        # "0.0 V" -> 0.0 -> "0"
         # "1000.0 Ohm" -> 1000.0 -> "1e3"
         # "2272.73 fF" -> 2272.73 -> "2.27273e+03"
         parts = var_value.strip().split()
@@ -234,14 +236,22 @@ def write_itemdef_ael(cell_dir_path, cell_name: str, design_variables: list) -> 
         except:
             sci = num_str
         
-        # Description: extract from var_name (capitalized)
-        desc = f"{var_name.lower()} parameter"
+        # Description: generate from var_name
+        # Vgate -> "gate voltage", Rs -> "series resistance", Cp -> "parallel capacitance"
+        if var_name.lower() == "vgate":
+            desc = "gate control voltage (V)"
+        elif var_name.lower() == "rs":
+            desc = "series resistance (ohm)"
+        elif var_name.lower() == "cp":
+            desc = "parallel capacitance (F)"
+        else:
+            desc = f"{var_name.lower()} parameter"
         
         # Create parameter: create_parm("name", "description", flags, "StdFormSet", -1, prm("StdForm", "default"))
         parm = f'create_parm("{var_name}","{desc}",68608,"StdFormSet",-1,prm("StdForm","{sci}"))'
         parm_list.append(parm)
     
-    # Join parameters with comma
+    # Join parameters with comma + newline
     parm_args = ',\n'.join(parm_list)
     
     # Build the create_item call
@@ -263,4 +273,4 @@ def write_itemdef_ael(cell_dir_path, cell_name: str, design_variables: list) -> 
     
     itemdef_path.write_text(ael_content, encoding='utf-8')
     print(f"[itemdef] wrote {itemdef_path}")
-    print(f"[itemdef] defines {len(parm_list)} user parameters")
+    print(f"[itemdef] auto-generated {len(parm_list)} user parameters from .VAR declarations:")
