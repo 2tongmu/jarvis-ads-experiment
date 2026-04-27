@@ -1,6 +1,6 @@
 cell_name: SPDT_SWITCH
 source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
-parse_timestamp: '2026-04-26T15:22:14'
+parse_timestamp: '2026-04-27T00:35:53'
 phase_required: 3
 ports:
 - name: P1

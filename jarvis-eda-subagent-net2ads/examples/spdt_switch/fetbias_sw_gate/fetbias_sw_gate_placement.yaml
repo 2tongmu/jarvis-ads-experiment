@@ -1,6 +1,6 @@
 cell_name: FETBIAS_SW_GATE
 source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
-generation_timestamp: '2026-04-27T00:26:34'
+generation_timestamp: '2026-04-27T00:35:49'
 ports:
 - name: VCTRL
   node: VCTRL
