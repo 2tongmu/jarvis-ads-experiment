@@ -95,10 +95,15 @@ If a request falls outside these boundaries, the agent logs it in MEMORY.md Sect
 
 **Interpreter:** ADS-bundled Python only — not system Python.
 
-| Machine | Path |
-|---|---|
-| Jarvis (CI/production) | `C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe` |
-| Local dev | `C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe` |
+**Auto-Detection:** The pipeline automatically detects ADS installation by searching for known paths
+in order: Jarvis production → Local dev → Explicit override. See `ENVIRONMENT.md` for full details.
+
+| Machine | Path | Status |
+|---|---|---|
+| Jarvis (CI/production) | `C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe` | ✅ Active |
+| Local dev | `C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe` | ⚠️ Template |
+
+**Setup & troubleshooting:** See `ENVIRONMENT.md` (this directory)
 
 **Confirmed API source:** `../jarvis-eda-learning/workspace-scripts/ADS_API_REFERENCE.md`
 
