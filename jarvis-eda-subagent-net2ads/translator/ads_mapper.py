@@ -350,10 +350,12 @@ def _map_sw_to_fet(
     next_port_number: list,  # mutable [int] counter
 ) -> tuple:
     """
-    Map one SW element to a FET instance + fetbias subcell + VCTRL port.
+    Map one SW element to a FET instance + fetbias_sw_gate subcell (1-port).
 
-    Returns (list[BuildInstance], BuildPort_or_None).
-    The VCTRL BuildPort is the exposed control pin on the parent cell.
+    fetbias_sw_gate now has internal V_DC source. Gate voltage is controlled
+    via per-instance Vgate parameter (no external VCTRL port needed).
+
+    Returns (list[BuildInstance], None).
     """
     ads_lib  = sw_entry["ads_lib"]
     ads_cell = sw_entry["ads_cell"]
@@ -382,8 +384,7 @@ def _map_sw_to_fet(
         api_status="UNCONFIRMED",
     ))
 
-    # 2. fetbias subcell instance
-    vctrl_net = f"VCTRL_{ir_comp.id}"
+    # 2. fetbias subcell instance (1-port: GATE only, V_DC internal)
     gate_net  = f"GATE_{ir_comp.id}"
     instances.append(BuildInstance(
         id=f"BIAS_{ir_comp.id}",
@@ -393,22 +394,18 @@ def _map_sw_to_fet(
         params={
             "Rs": f"{rs_ohm:.1f} Ohm",
             "Cp": f"{cp_ff:.2f} fF",
+            "Vgate": f"{sw_entry.get('vgate', 0):.1f} V",
         },
         role="fetbias",
-        nodes=[vctrl_net, gate_net],
+        nodes=[gate_net],  # 1-port: GATE only (V_DC is internal)
         phase_required=3,
-        api_status="UNCONFIRMED",
+        api_status="CONFIRMED 2026-04-27",
     ))
 
-    # 3. VCTRL port — exposed on parent cell for external bias drive
-    vctrl_port = BuildPort(
-        name=vctrl_net,
-        node=vctrl_net,
-        number=next_port_number[0],
-    )
-    next_port_number[0] += 1
+    # 3. No external VCTRL port (V_DC is internal to fetbias_sw_gate)
+    # Gate voltage controlled per-instance via Vgate parameter
 
-    return instances, vctrl_port
+    return instances, None
 
 
 # ── Main mapper ────────────────────────────────────────────────────────────────
