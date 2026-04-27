@@ -177,3 +177,90 @@ def commit_design(session: ADSSession, design) -> None:
     """
     session.db.Transaction(design, "net2ads_build").commit()
     print("[commit] design transaction committed (OpenAccess metadata finalized)")
+
+
+def write_itemdef_ael(cell_dir_path, cell_name: str, design_variables: list) -> None:
+    """
+    Write itemdef.ael file to expose design variables as user parameters.
+
+    In ADS, schematic design variables are only exposed as "user parameters"
+    (Component Parameters) when instantiated in a parent schematic if the cell
+    has an itemdef.ael file.
+
+    This function generates and writes the AEL file that registers design
+    variables as component parameters.
+
+    Args:
+        cell_dir_path     : path to the cell directory (e.g. C:\...\net2ads_lib\fetbias_sw_gate\)
+        cell_name         : name of the cell (e.g. "fetbias_sw_gate")
+        design_variables  : list of (var_name, var_value) tuples
+                            e.g. [("Rs", "1000.0 Ohm"), ("Cp", "2272.73 fF")]
+
+    API status:
+        File I/O only — no ADS API involved (itemdef.ael is static text)
+    """
+    from pathlib import Path
+    
+    cell_dir = Path(cell_dir_path)
+    itemdef_path = cell_dir / 'itemdef.ael'
+    
+    # Build parameter declarations
+    parm_list = []
+    for var_name, var_value in design_variables:
+        # Extract the numeric part and convert to scientific notation
+        # "1000.0 Ohm" -> 1000.0 -> "1e3"
+        # "2272.73 fF" -> 2272.73 -> "2.27273e+03"
+        parts = var_value.strip().split()
+        num_str = parts[0]
+        
+        try:
+            num_float = float(num_str)
+            # Use simple format: if it's a power of 10, use e-notation
+            # Otherwise use scientific notation
+            if num_float == 0:
+                sci = "0"
+            elif num_float >= 1e9:
+                sci = f"{num_float:.1e}".replace('e+0', 'e+').replace('e-0', 'e-')
+            elif num_float >= 1:
+                # Check if it's a power of 10
+                import math
+                if num_float == 10 ** round(math.log10(num_float)):
+                    exp = round(math.log10(num_float))
+                    sci = f"1e{exp}"
+                else:
+                    sci = f"{num_float:.5e}".rstrip('0').rstrip('.')
+            else:
+                sci = f"{num_float:.2e}".replace('e-0', 'e-').replace('+0', '+')
+        except:
+            sci = num_str
+        
+        # Description: extract from var_name (capitalized)
+        desc = f"{var_name.lower()} parameter"
+        
+        # Create parameter: create_parm("name", "description", flags, "StdFormSet", -1, prm("StdForm", "default"))
+        parm = f'create_parm("{var_name}","{desc}",68608,"StdFormSet",-1,prm("StdForm","{sci}"))'
+        parm_list.append(parm)
+    
+    # Join parameters with comma
+    parm_args = ',\n'.join(parm_list)
+    
+    # Build the create_item call
+    # Reference format (from manual cell):
+    # create_item("cell_name","cell_name","X",16,-1,NULL,"Component Parameters",NULL,
+    #     "%43?global %;%d:%t %# %44?0%:%31?%C%:_net%c%;%;%e %b%r%8?%29?%:%30?%p %:%k%?[%1i]%;=%p %;%;%;%e%e",
+    #     "cell_name",
+    #     "%t%b%r%38?%:\n%30?%s%:%k%?[%1i]%;=%s%;%;%e%e%;","",3,NULL,0,
+    #     create_parm(...),
+    #     create_parm(...));
+    
+    ael_content = (
+        f'create_item("{cell_name}","{cell_name}","X",16,-1,NULL,"Component Parameters",NULL,'
+        f'"%43?global %;%d:%t %# %44?0%:%31?%C%:_net%c%;%;%e %b%r%8?%29?%:%30?%p %:%k%?[%1i]%;=%p %;%;%;%e%e",'
+        f'"{cell_name}",'
+        f'"%t%b%r%38?%:\n%30?%s%:%k%?[%1i]%;=%s%;%;%e%e%;","",3,NULL,0,\n'
+        f'{parm_args});'
+    )
+    
+    itemdef_path.write_text(ael_content, encoding='utf-8')
+    print(f"[itemdef] wrote {itemdef_path}")
+    print(f"[itemdef] defines {len(parm_list)} user parameters")

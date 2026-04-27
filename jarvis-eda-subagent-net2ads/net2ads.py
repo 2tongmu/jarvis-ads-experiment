@@ -343,7 +343,7 @@ def main():
 
     from ads_api.ads_session   import get_ads_session
     from ads_api.workspace_ops import open_workspace, open_workspace_with_pdk
-    from ads_api.cell_ops      import open_or_create_schematic, save_design, commit_design
+    from ads_api.cell_ops      import open_or_create_schematic, save_design, commit_design, write_itemdef_ael
     from ads_api.schematic_ops import place_port, place_instance, connect
     from ads_api.symbol_ops    import create_dual_symbol
 
@@ -405,6 +405,13 @@ def main():
         create_dual_symbol(session, lib, lib_name, cell, cell_name, design,
                            port_angles=port_angles)
         print(f"  [symbol]    {lib_name}:{cell_name}:symbol     saved")
+
+        # Generate itemdef.ael to expose design variables as user parameters
+        # This enables the design variables (e.g. Rs, Cp) to appear as editable
+        # "Component Parameters" when the cell is instantiated in a parent schematic.
+        if plan_bp.design_variables:
+            cell_dir = Path(args.workspace) / lib_name / cell_name
+            write_itemdef_ael(cell_dir, cell_name, plan_bp.design_variables)
 
     except Exception as exc:
         import traceback
