@@ -371,7 +371,10 @@ def main():
                 "Fix ADS session / workspace setup and retry.", str(exc))
         sys.exit(1)
 
-    port_angles = {p.name: (180.0 if p.number == 1 else 0.0) for p in placement.ports}
+    port_angles = {
+        p.name: (180.0 if (p.number == 1 or p.name.startswith("VCTRL")) else 0.0)
+        for p in placement.ports
+    }
 
     try:
         cell, design = open_or_create_schematic(session, lib, cell_name)

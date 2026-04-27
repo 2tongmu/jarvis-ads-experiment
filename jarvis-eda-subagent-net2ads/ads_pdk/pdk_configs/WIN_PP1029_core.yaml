@@ -200,3 +200,40 @@ placement_recipes:
       gate:   "(node_x - 0.5, -0.5)"    # left of signal tap, below signal line
       drain:  "(node_x,        0.0)"     # signal tap
       source: "(node_x,       -1.0)"     # to Rtrm → GND chain
+
+# ── SPDT multi-rail placement (from placement_engine.py _assign_spdt_coordinates) ──
+# Used when path_y != 0 (separate signal rails for each output path).
+# All formulas use path_y as the signal rail y-coordinate.
+
+  series_fet_spdt_rail:
+    description: >
+      Series FET on SPDT path rail at path_y (e.g. ±2.0).
+      Drain at N_COM=branch_x, source starts the passive chain.
+    angle: 90
+    origin_formula: "(branch_x + 0.5, path_y - 0.5)"
+    resulting_pins:
+      gate:   "(branch_x + 0.5, path_y - 0.5)"   # = origin; fetbias GATE must land here
+      drain:  "(branch_x,       path_y)"           # co-locates with N_COM vertical wire
+      source: "(branch_x + 1.0, path_y)"           # first path passive P1 co-locates here
+    fetbias_origin_formula: "(gate_x - 2.0, gate_y)"
+    notes: >
+      fetbias GATE pin is at (+2.0, 0) from fetbias origin, so placing fetbias at
+      (gate_x - 2.0, gate_y) makes GATE land exactly at FET gate — zero-wire connection.
+      VCTRL port also placed at fetbias origin (VCTRL pin is at (0,0)).
+
+  shunt_fet_spdt_rail:
+    description: >
+      Shunt FET on SPDT path rail. Drain taps signal node, source to RTERM.
+    angle: 0
+    origin_formula: "(tap_x - 0.5, path_y - 0.5)"
+    resulting_pins:
+      gate:   "(tap_x - 0.5, path_y - 0.5)"   # = origin; fetbias GATE must land here
+      drain:  "(tap_x,       path_y)"           # signal rail tap
+      source: "(tap_x,       path_y - 1.0)"    # RTERM P1 must be placed here
+    rterm_formula:   "(tap_x, path_y - 1.0)"   # RTERM co-locates with source — no wire
+    gnd_formula:     "(tap_x, path_y - 2.0)"   # GND symbol 1 unit below RTERM
+    fetbias_origin_formula: "(gate_x - 2.0, gate_y)"
+    notes: >
+      RTERM (shunt R) placed at shunt FET source position (tap_x, path_y-1.0).
+      No wire needed: RTERM P1 and FET source are co-located.
+      GND companion 1 unit below RTERM.

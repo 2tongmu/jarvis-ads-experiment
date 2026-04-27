@@ -1,6 +1,6 @@
 cell_name: SPDT_SWITCH
 source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
-generation_timestamp: '2026-04-26T15:22:14'
+generation_timestamp: '2026-04-27T00:26:35'
 ports:
 - name: P1
   node: P1
@@ -10,33 +10,33 @@ ports:
 - name: P2
   node: P2
   number: 2
-  x: 12.875
+  x: 11.875
   y: 2.0
 - name: P3
   node: P3
   number: 3
-  x: 12.875
+  x: 11.875
   y: -2.0
 - name: VCTRL_SW_SERIES_A
   node: VCTRL_SW_SERIES_A
   number: 4
-  x: 7.875
-  y: -1.5
+  x: 4.375
+  y: 1.5
 - name: VCTRL_SW_SHUNT_A
   node: VCTRL_SW_SHUNT_A
   number: 5
-  x: 10.875
-  y: -1.5
+  x: 7.375
+  y: 1.5
 - name: VCTRL_SW_SERIES_B
   node: VCTRL_SW_SERIES_B
   number: 6
-  x: 7.875
-  y: -5.5
+  x: 4.375
+  y: -2.5
 - name: VCTRL_SW_SHUNT_B
   node: VCTRL_SW_SHUNT_B
   number: 7
-  x: 10.875
-  y: -5.5
+  x: 7.375
+  y: -2.5
 instances:
 - id: RIN_PAD
   ads_lib: ads_rflib
@@ -58,11 +58,22 @@ instances:
   params:
     L: 10 pH
   role: series
+- id: Q_SW_SERIES_A
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 6.375
+  y: 1.5
+  angle: 90.0
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
 - id: RPATH_A
   ads_lib: ads_rflib
   ads_cell: R
   ads_view: symbol
-  x: 7.875
+  x: 6.875
   y: 2.0
   angle: 0.0
   params:
@@ -72,7 +83,7 @@ instances:
   ads_lib: ads_rflib
   ads_cell: L
   ads_view: symbol
-  x: 9.875
+  x: 8.875
   y: 2.0
   angle: 0.0
   params:
@@ -82,18 +93,29 @@ instances:
   ads_lib: ads_rflib
   ads_cell: R
   ads_view: symbol
-  x: 11.875
+  x: 10.875
   y: 2.0
   angle: 0.0
   params:
     R: 0.05 Ohm
   role: series
+- id: Q_SW_SHUNT_A
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 9.375
+  y: 1.5
+  angle: 0.0
+  params:
+    NOF: '2'
+    UGW: 100 um
+  role: fet_shunt
 - id: RTERM_A
   ads_lib: ads_rflib
   ads_cell: R
   ads_view: symbol
-  x: 12.875
-  y: 2.0
+  x: 9.875
+  y: 1.0
   angle: -90.0
   params:
     R: 50 Ohm
@@ -102,38 +124,27 @@ instances:
   ads_lib: ads_rflib
   ads_cell: GROUND
   ads_view: symbol
-  x: 12.875
-  y: 1.0
+  x: 9.875
+  y: 0.0
   angle: -90.0
   params: {}
   role: gnd
-- id: Q_SW_SERIES_A
+- id: Q_SW_SERIES_B
   ads_lib: WIN_PP1029_DESIGN_KIT
   ads_cell: WIN_PP1029_CPW
   ads_view: symbol
-  x: 8.375
-  y: 1.5
+  x: 6.375
+  y: -2.5
   angle: 90.0
   params:
     NOF: '2'
     UGW: 160 um
   role: fet_series
-- id: Q_SW_SHUNT_A
-  ads_lib: WIN_PP1029_DESIGN_KIT
-  ads_cell: WIN_PP1029_CPW
-  ads_view: symbol
-  x: 11.375
-  y: 1.5
-  angle: 0.0
-  params:
-    NOF: '2'
-    UGW: 100 um
-  role: fet_shunt
 - id: RPATH_B
   ads_lib: ads_rflib
   ads_cell: R
   ads_view: symbol
-  x: 7.875
+  x: 6.875
   y: -2.0
   angle: 0.0
   params:
@@ -143,7 +154,7 @@ instances:
   ads_lib: ads_rflib
   ads_cell: L
   ads_view: symbol
-  x: 9.875
+  x: 8.875
   y: -2.0
   angle: 0.0
   params:
@@ -153,18 +164,29 @@ instances:
   ads_lib: ads_rflib
   ads_cell: R
   ads_view: symbol
-  x: 11.875
+  x: 10.875
   y: -2.0
   angle: 0.0
   params:
     R: 0.05 Ohm
   role: series
+- id: Q_SW_SHUNT_B
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 9.375
+  y: -2.5
+  angle: 0.0
+  params:
+    NOF: '2'
+    UGW: 100 um
+  role: fet_shunt
 - id: RTERM_B
   ads_lib: ads_rflib
   ads_cell: R
   ads_view: symbol
-  x: 12.875
-  y: -2.0
+  x: 9.875
+  y: -3.0
   angle: -90.0
   params:
     R: 50 Ohm
@@ -173,39 +195,17 @@ instances:
   ads_lib: ads_rflib
   ads_cell: GROUND
   ads_view: symbol
-  x: 12.875
-  y: -3.0
+  x: 9.875
+  y: -4.0
   angle: -90.0
   params: {}
   role: gnd
-- id: Q_SW_SERIES_B
-  ads_lib: WIN_PP1029_DESIGN_KIT
-  ads_cell: WIN_PP1029_CPW
-  ads_view: symbol
-  x: 8.375
-  y: -2.5
-  angle: 90.0
-  params:
-    NOF: '2'
-    UGW: 160 um
-  role: fet_series
-- id: Q_SW_SHUNT_B
-  ads_lib: WIN_PP1029_DESIGN_KIT
-  ads_cell: WIN_PP1029_CPW
-  ads_view: symbol
-  x: 11.375
-  y: -2.5
-  angle: 0.0
-  params:
-    NOF: '2'
-    UGW: 100 um
-  role: fet_shunt
 - id: BIAS_SW_SERIES_A
   ads_lib: net2ads_lib
   ads_cell: fetbias_sw_gate
   ads_view: symbol
-  x: 8.375
-  y: 0.0
+  x: 4.375
+  y: 1.5
   angle: 0.0
   params:
     Rs: 1000.0 Ohm
@@ -215,8 +215,8 @@ instances:
   ads_lib: net2ads_lib
   ads_cell: fetbias_sw_gate
   ads_view: symbol
-  x: 11.375
-  y: 0.0
+  x: 7.375
+  y: 1.5
   angle: 0.0
   params:
     Rs: 1040.2 Ohm
@@ -226,8 +226,8 @@ instances:
   ads_lib: net2ads_lib
   ads_cell: fetbias_sw_gate
   ads_view: symbol
-  x: 8.375
-  y: -4.0
+  x: 4.375
+  y: -2.5
   angle: 0.0
   params:
     Rs: 1000.0 Ohm
@@ -237,8 +237,8 @@ instances:
   ads_lib: net2ads_lib
   ads_cell: fetbias_sw_gate
   ads_view: symbol
-  x: 11.375
-  y: -4.0
+  x: 7.375
+  y: -2.5
   angle: 0.0
   params:
     Rs: 1040.2 Ohm
@@ -248,37 +248,37 @@ wires:
 - id: wire_0
   points:
   - !!python/tuple
-    - 8.875
+    - 7.875
     - 2.0
   - !!python/tuple
-    - 9.875
+    - 8.875
     - 2.0
   note: net 'N_A2' y=2.0
 - id: wire_1
   points:
   - !!python/tuple
-    - 10.875
+    - 9.875
     - 2.0
   - !!python/tuple
-    - 11.875
+    - 10.875
     - 2.0
   note: net 'N_A3' y=2.0
 - id: wire_2
   points:
   - !!python/tuple
-    - 8.875
+    - 7.875
     - -2.0
   - !!python/tuple
-    - 9.875
+    - 8.875
     - -2.0
   note: net 'N_B2' y=-2.0
 - id: wire_3
   points:
   - !!python/tuple
-    - 10.875
+    - 9.875
     - -2.0
   - !!python/tuple
-    - 11.875
+    - 10.875
     - -2.0
   note: net 'N_B3' y=-2.0
 - id: wire_4
@@ -299,6 +299,24 @@ wires:
     - 2.875
     - 0.0
   note: net 'P1' y=0.0
+- id: wire_6
+  points:
+  - !!python/tuple
+    - 5.875
+    - 0.0
+  - !!python/tuple
+    - 5.875
+    - 2.0
+  note: 'N_COM: y=0 -> path_a'
+- id: wire_7
+  points:
+  - !!python/tuple
+    - 5.875
+    - 0.0
+  - !!python/tuple
+    - 5.875
+    - -2.0
+  note: 'N_COM: y=0 -> path_b'
 warnings:
 - '[INFO] Backbone trace skipped for 3-port topology (''P1'' -> ''P2''). Expected
   for SPDT circuits.'

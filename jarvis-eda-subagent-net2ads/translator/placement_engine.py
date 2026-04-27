@@ -117,10 +117,8 @@ class PlacementPlan:
 # ── SPDT layout constants (from WIN_PP1029_core.yaml confirmed pin offsets) ────
 PATH_A_Y          =  2.0   # Path A signal rail y
 PATH_B_Y          = -2.0   # Path B signal rail y
-FET_SERIES_ORIGIN_DY = -0.5  # series FET origin below signal rail (angle=90)
-FET_SHUNT_ORIGIN_DY  = -0.5  # shunt FET origin below signal rail (angle=0)
-FETBIAS_Y_BELOW_GATE = 1.5   # fetbias placed 1.5 units below FET gate
-VCTRL_Y_BELOW_GATE   = 3.0   # VCTRL port placed 3.0 units below FET gate
+# FET origin offsets (angle=90 series, angle=0 shunt) — both -0.5 below signal rail
+FET_ORIGIN_DY     = -0.5   # origin is 0.5 units below path_y for both FET types
 
 
 # ── Angle assignment ───────────────────────────────────────────────────────────
@@ -257,6 +255,36 @@ def _partition_spdt_paths(
     return common_insts, path_a_series, path_a_shunts, path_b_series, path_b_shunts
 
 
+def _order_chain(insts: list, start_node: str, end_node: str) -> list:
+    """
+    Order series instances as a linear chain from start_node to end_node.
+    Uses greedy walk through adjacency — returns instances in signal-flow order.
+    Returns empty list if start_node is not found in any instance's nodes.
+    """
+    adj: dict = {}
+    for inst in insts:
+        if len(inst.nodes) >= 2:
+            n0, n1 = inst.nodes[0], inst.nodes[1]
+            adj.setdefault(n0, []).append((inst, n1))
+            adj.setdefault(n1, []).append((inst, n0))
+
+    ordered = []
+    current = start_node
+    visited: set = set()
+    while current != end_node:
+        found = False
+        for inst, next_node in adj.get(current, []):
+            if inst.id not in visited:
+                ordered.append(inst)
+                visited.add(inst.id)
+                current = next_node
+                found = True
+                break
+        if not found:
+            break
+    return ordered
+
+
 def _assign_spdt_coordinates(
     build_plan: BuildPlan,
     warnings: list,
@@ -264,21 +292,25 @@ def _assign_spdt_coordinates(
     """
     Compute placement for a 3-port SPDT with PDK FETs and fetbias subcells.
 
-    Layout:
-      y=0: common section (P1 → N_COM)
-      y=+PATH_A_Y: Path A signal rail (N_COM → P2)
-      y=-PATH_B_Y: Path B signal rail (N_COM → P3)
+    Layout (from WIN_PP1029_core.yaml placement_recipes, SPDT multi-rail):
+      y=0       : common section (P1 → N_COM via RIN_PAD, LIN_PAD)
+      y=PATH_A_Y: Path A signal rail (N_COM → P2)
+      y=PATH_B_Y: Path B signal rail (N_COM → P3)
 
-    FET placement (from WIN_PP1029_core.yaml placement_recipes):
-      series FET angle=90: origin=(x_drain+0.5, path_y-0.5), gate=(x_drain+0.5, path_y-0.5)
-      shunt FET  angle=0:  origin=(node_x-0.5,  path_y-0.5), gate=(node_x-0.5,  path_y-0.5)
+    Series FET (angle=90) origin formula: (branch_x+0.5, path_y-0.5)
+      → drain=(branch_x, path_y), source=(branch_x+1.0, path_y), gate=origin
+    Shunt FET (angle=0) origin formula: (tap_x-0.5, path_y-0.5)
+      → drain=(tap_x, path_y), source=(tap_x, path_y-1.0), gate=origin
 
-    fetbias placed below FET gate:  (gate_x, gate_y - FETBIAS_Y_BELOW_GATE)
-    VCTRL port placed below fetbias: (gate_x, gate_y - VCTRL_Y_BELOW_GATE)
+    fetbias origin = (gate_x-2.0, gate_y)  so GATE pin lands at FET gate
+    VCTRL port co-located with fetbias origin (VCTRL pin is at (0,0))
+    RTERM placed at shunt FET source (tap_x, path_y-1.0)
+    GND companion 1 unit below RTERM
     """
     rf_ports = [p for p in build_plan.ports if not p.name.startswith("VCTRL")]
     vctrl_ports = [p for p in build_plan.ports if p.name.startswith("VCTRL")]
     port_by_number = {p.number: p for p in rf_ports}
+    vctrl_port_map = {p.node: p for p in vctrl_ports}
 
     (common_insts, path_a_series, path_a_shunts,
      path_b_series, path_b_shunts) = _partition_spdt_paths(build_plan)
@@ -288,162 +320,196 @@ def _assign_spdt_coordinates(
 
     # ── Common section layout (y=0) ───────────────────────────────────────────
     x = FIRST_SHUNT_X
-    common_node_x: dict = {}
-    p1_node = port_by_number.get(1, rf_ports[0]).node if rf_ports else None
-    if p1_node:
-        common_node_x[p1_node] = PORT_LEFT_X
     for inst in common_insts:
-        common_node_x[inst.nodes[0]] = x
         placed_instances.append(PlacedInstance(
             id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
             ads_view=inst.ads_view, x=round(x, 4), y=SIGNAL_Y,
             angle=_angle_for(inst), params=inst.params, role=inst.role,
         ))
         x += COMPONENT_SPACING
-    branch_x = x - COMPONENT_SPACING + COMP_WIDTH  # x of N_COM node
+    # branch_x = P2 pin of last common inst = x of N_COM node on y=0 rail
+    branch_x = round(x - COMPONENT_SPACING + COMP_WIDTH, 4)
 
-    # ── Path layout helper ────────────────────────────────────────────────────
-    def _layout_path(
-        series_insts, shunt_insts, fet_insts, path_y, port_node,
+    # ── Classify FETs into path A / path B ───────────────────────────────────
+    all_fets    = [i for i in build_plan.instances if i.role in ("fet_series", "fet_shunt")]
+    all_fetbias = [i for i in build_plan.instances if i.role == "fetbias"]
+
+    def _fets_for_path(path_series_list, path_shunts_list):
+        """Return (series_fets, shunt_fets) whose nodes overlap with this path."""
+        path_nodes: set = set()
+        for inst in path_series_list + path_shunts_list:
+            path_nodes.update(inst.nodes)
+        ser = [f for f in all_fets if f.role == "fet_series"
+               and any(n in path_nodes for n in f.nodes)]
+        sh  = [f for f in all_fets if f.role == "fet_shunt"
+               and any(n in path_nodes for n in f.nodes)]
+        return ser, sh
+
+    ser_fets_a, sh_fets_a = _fets_for_path(path_a_series, path_a_shunts)
+    ser_fets_b, sh_fets_b = _fets_for_path(path_b_series, path_b_shunts)
+
+    # ── Path layout inner function ────────────────────────────────────────────
+    p2_node = port_by_number[2].node if 2 in port_by_number else None
+    p3_node = port_by_number[3].node if 3 in port_by_number else None
+
+    def _layout_spdt_path(
+        series_passives, shunt_passives, series_fets_p, shunt_fets_p,
+        path_y, port_out_node,
     ):
-        """Layout one SPDT path at given path_y. Returns placed items + end_x."""
-        placed = []
-        node_x = {}
-        px = branch_x + COMPONENT_SPACING
+        """
+        Layout one SPDT signal path.
 
-        for inst in series_insts:
-            # Distinguish FET from passive based on companion FET lookup
-            node_x[inst.nodes[0]] = px
+        Returns (placed, end_x, gate_pos_series, gate_pos_shunt) where
+        gate_pos_* = (x, y) of the FET gate (= FET origin for WIN_PP1029_CPW).
+        """
+        placed = []
+        node_pos: dict = {}   # {node_name: (x, y)} for wire computation
+
+        # ── Series FET (angle=90) ─────────────────────────────────────────────
+        # origin=(branch_x+0.5, path_y-0.5) → drain=(branch_x, path_y), source=(branch_x+1, path_y)
+        ser_fet = series_fets_p[0] if series_fets_p else None
+        gate_pos_ser = None
+        if ser_fet:
+            org_x = round(branch_x + 0.5, 4)
+            org_y = round(path_y - 0.5, 4)
+            placed.append(PlacedInstance(
+                id=ser_fet.id, ads_lib=ser_fet.ads_lib, ads_cell=ser_fet.ads_cell,
+                ads_view=ser_fet.ads_view, x=org_x, y=org_y,
+                angle=90.0, params=ser_fet.params, role=ser_fet.role,
+            ))
+            gate_pos_ser = (org_x, org_y)
+            node_pos[ser_fet.nodes[0]] = (branch_x,       round(path_y, 4))   # drain = N_COM
+            node_pos[ser_fet.nodes[1]] = (branch_x + 1.0, round(path_y, 4))   # source = N_A1/N_B1
+            source_node = ser_fet.nodes[1]
+        else:
+            source_node = None
+
+        # ── Series passives — ordered from FET source to output port ─────────
+        if source_node and port_out_node:
+            ordered_passives = _order_chain(series_passives, source_node, port_out_node)
+        else:
+            ordered_passives = list(series_passives)
+        if not ordered_passives and series_passives:
+            ordered_passives = list(series_passives)
+            warnings.append(
+                f"[WARN] Could not order path passives from '{source_node}' to "
+                f"'{port_out_node}' — using buildplan order"
+            )
+
+        # Passives start at FET source x (co-located with source pin — no wire needed)
+        px = round(branch_x + 1.0, 4)
+        for inst in ordered_passives:
             placed.append(PlacedInstance(
                 id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
                 ads_view=inst.ads_view, x=round(px, 4), y=round(path_y, 4),
-                angle=_angle_for(inst), params=inst.params, role=inst.role,
+                angle=ANGLE_SERIES, params=inst.params, role=inst.role,
             ))
-            node_x[inst.nodes[1]] = px + COMP_WIDTH
+            # Use setdefault: first assignment wins (P2 of previous comp = correct tap x)
+            # e.g. LPATH_A P2 sets N_A3=9.875; ROUT_A P1 at 10.875 must NOT overwrite it.
+            node_pos.setdefault(inst.nodes[0], (round(px, 4),             round(path_y, 4)))
+            node_pos.setdefault(inst.nodes[1], (round(px + COMP_WIDTH, 4), round(path_y, 4)))
             px += COMPONENT_SPACING
 
-        # Shunts: placed at tap node x on signal path
-        for inst in shunt_insts:
+        end_x = round(px - COMPONENT_SPACING + COMP_WIDTH, 4)
+
+        # ── Shunt FET (angle=0) ───────────────────────────────────────────────
+        # origin=(tap_x-0.5, path_y-0.5) → drain=(tap_x, path_y), source=(tap_x, path_y-1.0)
+        sh_fet = shunt_fets_p[0] if shunt_fets_p else None
+        gate_pos_sh = None
+        if sh_fet:
+            tap_node = sh_fet.nodes[0]    # N_A3 / N_B3 — signal rail tap
+            src_node = sh_fet.nodes[1]    # N_AST / N_BST — to RTERM
+            tap_pos = node_pos.get(tap_node)
+            if tap_pos is None:
+                warnings.append(
+                    f"[WARN] shunt FET '{sh_fet.id}' tap '{tap_node}' not in node_pos"
+                )
+                tap_x = end_x
+            else:
+                tap_x = tap_pos[0]
+            org_x = round(tap_x - 0.5, 4)
+            org_y = round(path_y - 0.5, 4)
+            placed.append(PlacedInstance(
+                id=sh_fet.id, ads_lib=sh_fet.ads_lib, ads_cell=sh_fet.ads_cell,
+                ads_view=sh_fet.ads_view, x=org_x, y=org_y,
+                angle=0.0, params=sh_fet.params, role=sh_fet.role,
+            ))
+            gate_pos_sh = (org_x, org_y)
+            # source = (tap_x, path_y - 1.0)
+            node_pos[src_node] = (round(tap_x, 4), round(path_y - 1.0, 4))
+
+        # ── Shunt passives (RTERM) at shunt FET source position ───────────────
+        for inst in shunt_passives:
             tap = next((n for n in inst.nodes if not _is_ground_node(n)), None)
-            sx = node_x.get(tap, px - COMP_WIDTH)
+            tap_pos = node_pos.get(tap) if tap else None
+            if tap_pos:
+                rterm_x, rterm_y = tap_pos
+            else:
+                rterm_x = round(end_x, 4)
+                rterm_y = round(path_y - 1.0, 4)
+                warnings.append(
+                    f"[WARN] RTERM '{inst.id}': tap '{tap}' not found, using fallback position"
+                )
             placed.append(PlacedInstance(
                 id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
-                ads_view=inst.ads_view, x=round(sx, 4), y=round(path_y, 4),
+                ads_view=inst.ads_view, x=round(rterm_x, 4), y=round(rterm_y, 4),
                 angle=ANGLE_SHUNT, params=inst.params, role=inst.role,
             ))
-            # GND companion
+            # GND companion 1 unit below RTERM
             gnd_id = f"GND_{inst.id}"
             gnd = next((i for i in build_plan.instances if i.id == gnd_id), None)
             if gnd:
                 placed.append(PlacedInstance(
                     id=gnd.id, ads_lib=gnd.ads_lib, ads_cell=gnd.ads_cell,
-                    ads_view=gnd.ads_view, x=round(sx, 4),
-                    y=round(path_y + GND_Y, 4),
+                    ads_view=gnd.ads_view, x=round(rterm_x, 4),
+                    y=round(rterm_y - 1.0, 4),
                     angle=ANGLE_GND, params=gnd.params, role=gnd.role,
                 ))
 
-        # FET instances on this path
-        for inst in fet_insts:
-            if inst.role == "fet_series":
-                # Find x from drain node — look up x of entry node
-                entry_node = inst.nodes[0] if inst.nodes else None
-                x_drain = node_x.get(entry_node, branch_x + COMPONENT_SPACING)
-                origin_x = x_drain + 0.5
-                origin_y = path_y + FET_SERIES_ORIGIN_DY
-            else:  # fet_shunt
-                tap_node = inst.nodes[0] if inst.nodes else None
-                x_tap = node_x.get(tap_node, px)
-                origin_x = x_tap - 0.5
-                origin_y = path_y + FET_SHUNT_ORIGIN_DY
+        return placed, end_x, gate_pos_ser, gate_pos_sh
 
-            placed.append(PlacedInstance(
-                id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
-                ads_view=inst.ads_view, x=round(origin_x, 4), y=round(origin_y, 4),
-                angle=_angle_for(inst), params=inst.params, role=inst.role,
-            ))
-
-        end_x = px - COMPONENT_SPACING + COMP_WIDTH
-        return placed, end_x, node_x
-
-    # ── Classify FETs by path ─────────────────────────────────────────────────
-    fet_insts = [i for i in build_plan.instances if i.role in ("fet_series", "fet_shunt")]
-    path_a_ids = {i.id for i in path_a_series + path_a_shunts}
-    path_b_ids = {i.id for i in path_b_series + path_b_shunts}
-
-    # FET path assignment: FET's nodes[0] (entry) matches the series/shunt component
-    # it replaced. Walk back via the sw_map naming: Q_SW_SERIES_A → SW_SERIES_A.
-    fet_a, fet_b = [], []
-    for inst in fet_insts:
-        sw_name = inst.id.replace("Q_", "", 1)  # Q_SW_SERIES_A → SW_SERIES_A
-        # Check if any path_a component shares the same nodes
-        found_a = any(
-            set(s.nodes) & set(inst.nodes)
-            for s in path_a_series + path_a_shunts
-        )
-        found_b = any(
-            set(s.nodes) & set(inst.nodes)
-            for s in path_b_series + path_b_shunts
-        )
-        if found_a:
-            fet_a.append(inst)
-        elif found_b:
-            fet_b.append(inst)
-        else:
-            # Fallback: name-based heuristic (_A suffix → path A, _B → path B)
-            if sw_name.endswith("_A"):
-                fet_a.append(inst)
-            elif sw_name.endswith("_B"):
-                fet_b.append(inst)
-            else:
-                warnings.append(f"[WARN] FET '{inst.id}': cannot assign to path A or B — using path A")
-                fet_a.append(inst)
-
-    p2_node = port_by_number.get(2, None)
-    p3_node = port_by_number.get(3, None)
-
-    placed_a, end_x_a, node_x_a = _layout_path(
-        path_a_series, path_a_shunts, fet_a, PATH_A_Y,
-        p2_node.node if p2_node else None,
+    # ── Layout both paths ─────────────────────────────────────────────────────
+    placed_a, end_x_a, ser_gate_a, sh_gate_a = _layout_spdt_path(
+        path_a_series, path_a_shunts, ser_fets_a, sh_fets_a, PATH_A_Y, p2_node,
     )
-    placed_b, end_x_b, node_x_b = _layout_path(
-        path_b_series, path_b_shunts, fet_b, PATH_B_Y,
-        p3_node.node if p3_node else None,
+    placed_b, end_x_b, ser_gate_b, sh_gate_b = _layout_spdt_path(
+        path_b_series, path_b_shunts, ser_fets_b, sh_fets_b, PATH_B_Y, p3_node,
     )
     placed_instances.extend(placed_a)
     placed_instances.extend(placed_b)
 
-    # ── fetbias instances — placed below their FET gate ───────────────────────
-    fet_pos = {pi.id: pi for pi in placed_instances if pi.role in ("fet_series", "fet_shunt")}
+    # ── fetbias: origin=(gate_x-2.0, gate_y) so GATE pin lands at FET gate ───
+    # fetbias symbol: VCTRL pin at (0,0)=origin, GATE pin at (2.0,0) from origin.
+    gate_pos_map: dict = {}
+    if ser_fets_a and ser_gate_a: gate_pos_map[ser_fets_a[0].id] = ser_gate_a
+    if sh_fets_a  and sh_gate_a:  gate_pos_map[sh_fets_a[0].id]  = sh_gate_a
+    if ser_fets_b and ser_gate_b: gate_pos_map[ser_fets_b[0].id] = ser_gate_b
+    if sh_fets_b  and sh_gate_b:  gate_pos_map[sh_fets_b[0].id]  = sh_gate_b
 
-    fetbias_insts = [i for i in build_plan.instances if i.role == "fetbias"]
-    vctrl_port_map = {p.name: p for p in vctrl_ports}  # VCTRL_SW_SERIES_A → BuildPort
-
-    for inst in fetbias_insts:
-        # BIAS_SW_SERIES_A → Q_SW_SERIES_A
-        fet_id = inst.id.replace("BIAS_", "Q_", 1)
-        fet_pi = fet_pos.get(fet_id)
-        if fet_pi:
-            gate_x = fet_pi.x   # FET origin = gate position for both angle=90 and 0
-            gate_y = fet_pi.y
-        else:
-            warnings.append(f"[WARN] fetbias '{inst.id}': no matching FET '{fet_id}' found")
+    for inst in all_fetbias:
+        fet_id = inst.id.replace("BIAS_", "Q_", 1)   # BIAS_SW_SERIES_A → Q_SW_SERIES_A
+        gate_pos = gate_pos_map.get(fet_id)
+        if gate_pos is None:
+            warnings.append(f"[WARN] fetbias '{inst.id}': no gate position for '{fet_id}'")
             gate_x, gate_y = FIRST_SHUNT_X, SIGNAL_Y
+        else:
+            gate_x, gate_y = gate_pos
 
-        bias_x = gate_x
-        bias_y = gate_y - FETBIAS_Y_BELOW_GATE
+        bias_x = round(gate_x - 2.0, 4)
+        bias_y = round(gate_y, 4)
         placed_instances.append(PlacedInstance(
             id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
-            ads_view=inst.ads_view, x=round(bias_x, 4), y=round(bias_y, 4),
+            ads_view=inst.ads_view, x=bias_x, y=bias_y,
             angle=0.0, params=inst.params, role=inst.role,
         ))
 
-        # VCTRL port placed below fetbias
-        vctrl_name = inst.nodes[0] if inst.nodes else None  # VCTRL_SW_SERIES_A
-        vctrl_port = vctrl_port_map.get(vctrl_name)
+        # VCTRL port co-located at fetbias origin — VCTRL pin is at (0,0)
+        vctrl_node = inst.nodes[0] if inst.nodes else None
+        vctrl_port = vctrl_port_map.get(vctrl_node)
         if vctrl_port:
             placed_ports.append(PlacedPort(
                 name=vctrl_port.name, node=vctrl_port.node, number=vctrl_port.number,
-                x=round(bias_x - 0.5, 4), y=round(gate_y - VCTRL_Y_BELOW_GATE, 4),
+                x=bias_x, y=bias_y,
             ))
 
     # ── RF port positions ─────────────────────────────────────────────────────
@@ -451,21 +517,21 @@ def _assign_spdt_coordinates(
         name=port_by_number[1].name, node=port_by_number[1].node, number=1,
         x=PORT_LEFT_X, y=SIGNAL_Y,
     ))
-    if p2_node:
+    if p2_node and 2 in port_by_number:
         placed_ports.insert(1, PlacedPort(
-            name=p2_node.name, node=p2_node.node, number=2,
+            name=port_by_number[2].name, node=p2_node, number=2,
             x=round(end_x_a, 4), y=round(PATH_A_Y, 4),
         ))
-    if p3_node:
+    if p3_node and 3 in port_by_number:
         placed_ports.insert(2, PlacedPort(
-            name=p3_node.name, node=p3_node.node, number=3,
+            name=port_by_number[3].name, node=p3_node, number=3,
             x=round(end_x_b, 4), y=round(PATH_B_Y, 4),
         ))
 
-    # ── Wire routing — simplified: one wire per net on each path rail ─────────
+    # ── Wire routing ──────────────────────────────────────────────────────────
     placed_wires = _route_spdt_wires(
-        build_plan, placed_instances, placed_ports, common_insts,
-        path_a_series, path_b_series, PATH_A_Y, PATH_B_Y, branch_x,
+        build_plan, placed_instances, placed_ports,
+        branch_x, PATH_A_Y, PATH_B_Y,
     )
 
     return placed_ports, placed_instances, placed_wires
@@ -473,40 +539,82 @@ def _assign_spdt_coordinates(
 
 def _route_spdt_wires(
     build_plan, placed_instances, placed_ports,
-    common_insts, path_a_series, path_b_series,
-    path_a_y, path_b_y, branch_x,
+    branch_x, path_a_y, path_b_y,
 ) -> list:
     """
     Generate wire segments for the SPDT schematic.
-    One horizontal segment per net on each rail (common at y=0, paths at path_y).
-    Excludes gate/bias internal nets (those are wired by schematic_ops).
+
+    Wire categories:
+      1. Horizontal per-net segments (auto-derived from component pin positions):
+         - Common section: P1 wire, N_IN wire
+         - Path rail gaps: N_A2, N_A3, N_B2, N_B3 horizontal bridges
+         - N_A1/N_B1 co-located with series FET source (no wire needed)
+         - N_AST/N_BST co-located with RTERM P1 and shunt FET source (no wire needed)
+         - P2/P3 co-located with ROUT P2 (no wire needed)
+      2. N_COM vertical wires: (branch_x, 0) → (branch_x, ±path_y)
+
+    FET pin offsets (from WIN_PP1029_core.yaml, confirmed probe 2026-04-06):
+      angle=90 (series): drain=(origin.x-0.5, origin.y+0.5), source=(origin.x+0.5, origin.y+0.5)
+      angle=0  (shunt):  drain=(origin.x+0.5, origin.y+0.5), source=(origin.x+0.5, origin.y-0.5)
     """
-    # Build {net_name: {y_level: [x positions]}} from ports and placed instances
-    net_xs_by_y: dict = {}
-
+    net_xs_by_y: dict = {}   # {node: {y_level: {x_pos, ...}}}
     inst_map = {pi.id: pi for pi in placed_instances}
-    port_map = {pp.name: pp for pp in placed_ports}
 
+    # ── Ports (exclude VCTRL — co-located with fetbias origin, no wire) ───────
     for port in placed_ports:
         if port.name.startswith("VCTRL"):
-            continue  # bias control ports — no signal wire
-        net_xs_by_y.setdefault(port.node, {}).setdefault(port.y, set()).add(round(port.x, 6))
+            continue
+        net_xs_by_y.setdefault(port.node, {}).setdefault(
+            round(port.y, 6), set()
+        ).add(round(port.x, 6))
 
+    # ── Series/shunt passives ─────────────────────────────────────────────────
     for bi in build_plan.instances:
         pi = inst_map.get(bi.id)
-        if pi is None or bi.role in ("gnd", "fetbias", "fet_series", "fet_shunt"):
-            continue  # FET/fetbias wiring handled by schematic_ops
+        if pi is None or bi.role in ("gnd", "fetbias"):
+            continue
         if bi.role in ("series", "switch") and len(bi.nodes) >= 2:
             n0, n1 = bi.nodes[0], bi.nodes[1]
             if not _is_ground_node(n0):
-                net_xs_by_y.setdefault(n0, {}).setdefault(pi.y, set()).add(round(pi.x, 6))
+                net_xs_by_y.setdefault(n0, {}).setdefault(
+                    round(pi.y, 6), set()
+                ).add(round(pi.x, 6))
             if not _is_ground_node(n1):
-                net_xs_by_y.setdefault(n1, {}).setdefault(pi.y, set()).add(round(pi.x + COMP_WIDTH, 6))
+                net_xs_by_y.setdefault(n1, {}).setdefault(
+                    round(pi.y, 6), set()
+                ).add(round(pi.x + COMP_WIDTH, 6))
         elif bi.role == "shunt":
+            # Tap (non-ground) pin only — GND side is handled by place_ground()
             tap = next((n for n in bi.nodes if not _is_ground_node(n)), None)
             if tap:
-                net_xs_by_y.setdefault(tap, {}).setdefault(pi.y, set()).add(round(pi.x, 6))
+                net_xs_by_y.setdefault(tap, {}).setdefault(
+                    round(pi.y, 6), set()
+                ).add(round(pi.x, 6))
 
+    # ── FET pin positions (angle=90 series, angle=0 shunt) ───────────────────
+    for bi in build_plan.instances:
+        pi = inst_map.get(bi.id)
+        if pi is None or len(bi.nodes) < 2:
+            continue
+        if bi.role == "fet_series":   # angle=90
+            drain_x = round(pi.x - 0.5, 6)
+            drain_y = round(pi.y + 0.5, 6)
+            src_x   = round(pi.x + 0.5, 6)
+            src_y   = round(pi.y + 0.5, 6)   # same y as drain (signal rail)
+        elif bi.role == "fet_shunt":  # angle=0
+            drain_x = round(pi.x + 0.5, 6)
+            drain_y = round(pi.y + 0.5, 6)
+            src_x   = round(pi.x + 0.5, 6)
+            src_y   = round(pi.y - 0.5, 6)   # below drain
+        else:
+            continue
+        drain_node, src_node = bi.nodes[0], bi.nodes[1]
+        if not _is_ground_node(drain_node):
+            net_xs_by_y.setdefault(drain_node, {}).setdefault(drain_y, set()).add(drain_x)
+        if not _is_ground_node(src_node):
+            net_xs_by_y.setdefault(src_node, {}).setdefault(src_y, set()).add(src_x)
+
+    # ── Emit one horizontal wire per net per y-level (span > 0) ──────────────
     wires = []
     wire_idx = 0
     for node_name, y_map in sorted(net_xs_by_y.items()):
@@ -514,7 +622,7 @@ def _route_spdt_wires(
             xs_sorted = sorted(xs)
             x1, x2 = xs_sorted[0], xs_sorted[-1]
             if abs(x2 - x1) < 1e-9:
-                continue
+                continue  # co-located pins — ADS auto-connects, no wire needed
             wires.append(PlacedWire(
                 id=f"wire_{wire_idx}",
                 points=[(round(x1, 4), round(y_level, 4)),
@@ -522,6 +630,23 @@ def _route_spdt_wires(
                 note=f"net '{node_name}' y={y_level}",
             ))
             wire_idx += 1
+
+    # ── N_COM vertical wires: connect y=0 common rail to both path rails ──────
+    # LIN_PAD P2 is at (branch_x, 0.0); series FET drains are at (branch_x, ±path_y)
+    wires.append(PlacedWire(
+        id=f"wire_{wire_idx}",
+        points=[(round(branch_x, 4), round(SIGNAL_Y, 4)),
+                (round(branch_x, 4), round(path_a_y, 4))],
+        note="N_COM: y=0 -> path_a",
+    ))
+    wire_idx += 1
+    wires.append(PlacedWire(
+        id=f"wire_{wire_idx}",
+        points=[(round(branch_x, 4), round(SIGNAL_Y, 4)),
+                (round(branch_x, 4), round(path_b_y, 4))],
+        note="N_COM: y=0 -> path_b",
+    ))
+    wire_idx += 1
 
     return wires
 
