@@ -13,13 +13,16 @@ Updated by the agent during runs. Human-editable for corrections.
 | Phase 2 (TLIN + PDK) | ✅ Complete | 2026-04-26 | Ertong (ADS GUI) — see C:\Github_folders\jarvis-ads-experiment\PHASE2_SIGN_OFF.md |
 | Phase 3 (SW / SPDT) | ✅ Complete — Stage 4/5 SUCCESS | 2026-04-27 09:28 PDT | Schematic build verified on Jarvis Windows; pending probe results |
 
-**Phase 3 Build Summary (2026-04-27 09:28 PDT):**
+**Phase 3 Build Summary (2026-04-27 09:28 PDT, updated 14:43 PDT):**
 - ✅ fetbias_sw_gate schematic + symbol built successfully
 - ✅ spdt_switch schematic + symbol built successfully (4 FETs + 4 bias subcells)
 - ✅ Workspace: C:\Users\jarvis\ads_projects\spdt_phase3_test_wrk\net2ads_lib\
-- ⚠️ Design variable override on fetbias (J3-01) unconfirmed — using cell defaults
+- ✅ **J3-01 RESOLVED (2026-04-27 14:43 PDT):** Design variables (Rs, Cp) now properly defined and registered on fetbias cell
+  - Added `.VAR Rs 1000.0 Ohm` and `.VAR Cp 2272.73 fF` to netlist
+  - Verified identical to manual reference cell (fetbias_sw_gate_w_var)
+  - Ready for visual inspection in ADS GUI
 - All ports (P1, P2, P3, VCTRL×4) placed and routed
-- Ready for visual inspection + probe documentation
+- Ready for visual inspection + remaining probe documentation (J3-02, J3-04)
 
 Phase advancement requires human sign-off in this table.
 Agent must not self-advance phases.
