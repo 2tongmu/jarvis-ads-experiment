@@ -1,6 +1,6 @@
 cell_name: SPDT_SWITCH
-source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
-generation_timestamp: '2026-04-27T00:35:53'
+source_ir: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
+generation_timestamp: '2026-04-27T20:48:37'
 phase_required: 3
 ports:
 - name: P1
@@ -12,18 +12,6 @@ ports:
 - name: P3
   node: P3
   number: 3
-- name: VCTRL_SW_SERIES_A
-  node: VCTRL_SW_SERIES_A
-  number: 4
-- name: VCTRL_SW_SHUNT_A
-  node: VCTRL_SW_SHUNT_A
-  number: 5
-- name: VCTRL_SW_SERIES_B
-  node: VCTRL_SW_SERIES_B
-  number: 6
-- name: VCTRL_SW_SHUNT_B
-  node: VCTRL_SW_SHUNT_B
-  number: 7
 instances:
 - id: RIN_PAD
   ads_lib: ads_rflib
@@ -69,12 +57,12 @@ instances:
   params:
     Rs: 1000.0 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
   nodes:
-  - VCTRL_SW_SERIES_A
   - GATE_SW_SERIES_A
   phase_required: 3
-  api_status: UNCONFIRMED
+  api_status: CONFIRMED 2026-04-27
 - id: RPATH_A
   ads_lib: ads_rflib
   ads_cell: R
@@ -119,12 +107,12 @@ instances:
   params:
     Rs: 1040.2 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
   nodes:
-  - VCTRL_SW_SHUNT_A
   - GATE_SW_SHUNT_A
   phase_required: 3
-  api_status: UNCONFIRMED
+  api_status: CONFIRMED 2026-04-27
 - id: RTERM_A
   ads_lib: ads_rflib
   ads_cell: R
@@ -178,12 +166,12 @@ instances:
   params:
     Rs: 1000.0 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
   nodes:
-  - VCTRL_SW_SERIES_B
   - GATE_SW_SERIES_B
   phase_required: 3
-  api_status: UNCONFIRMED
+  api_status: CONFIRMED 2026-04-27
 - id: RPATH_B
   ads_lib: ads_rflib
   ads_cell: R
@@ -228,12 +216,12 @@ instances:
   params:
     Rs: 1040.2 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
   nodes:
-  - VCTRL_SW_SHUNT_B
   - GATE_SW_SHUNT_B
   phase_required: 3
-  api_status: UNCONFIRMED
+  api_status: CONFIRMED 2026-04-27
 - id: RTERM_B
   ads_lib: ads_rflib
   ads_cell: R

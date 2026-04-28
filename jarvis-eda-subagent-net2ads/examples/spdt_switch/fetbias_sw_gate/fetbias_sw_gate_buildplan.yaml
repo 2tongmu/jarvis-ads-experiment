@@ -1,15 +1,24 @@
 cell_name: FETBIAS_SW_GATE
-source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
-generation_timestamp: '2026-04-27T00:35:49'
-phase_required: 1
+source_ir: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
+generation_timestamp: '2026-04-27T20:48:15'
+phase_required: 3
 ports:
-- name: VCTRL
-  node: VCTRL
-  number: 1
 - name: GATE
   node: GATE
-  number: 2
+  number: 1
 instances:
+- id: VGATE
+  ads_lib: ads_sources
+  ads_cell: V_DC
+  ads_view: symbol
+  params:
+    Vdc: Vgate
+  role: vsource
+  nodes:
+  - N_VDD
+  - '0'
+  phase_required: 3
+  api_status: CONFIRMED
 - id: RS
   ads_lib: ads_rflib
   ads_cell: R
@@ -18,7 +27,7 @@ instances:
     R: Rs
   role: series
   nodes:
-  - VCTRL
+  - N_VDD
   - GATE
   phase_required: 1
   api_status: CONFIRMED
@@ -30,7 +39,7 @@ instances:
     C: Cp
   role: shunt
   nodes:
-  - VCTRL
+  - N_VDD
   - '0'
   phase_required: 1
   api_status: CONFIRMED
@@ -43,5 +52,14 @@ instances:
   nodes: []
   phase_required: 1
   api_status: CONFIRMED
-design_variables: []
+design_variables:
+- !!python/tuple
+  - Vgate
+  - 0.0 V
+- !!python/tuple
+  - Rs
+  - 1000.0 Ohm
+- !!python/tuple
+  - Cp
+  - 2272.73 fF
 warnings: []

@@ -1,26 +1,32 @@
 cell_name: FETBIAS_SW_GATE
-source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
-parse_timestamp: '2026-04-27T00:35:49'
-phase_required: 1
+source_file: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
+parse_timestamp: '2026-04-27T20:48:15'
+phase_required: 3
 ports:
-- name: VCTRL
-  node: VCTRL
-  number: 1
 - name: GATE
   node: GATE
-  number: 2
+  number: 1
 nodes:
 - name: GATE
   is_port: true
   connects_to_ground: false
-- name: VCTRL
-  is_port: true
+- name: N_VDD
+  is_port: false
   connects_to_ground: true
 components:
+- id: VGATE
+  type: V
+  nodes:
+  - N_VDD
+  - '0'
+  params:
+    Vdc: Vgate
+  role: vsource
+  phase_required: 3
 - id: RS
   type: R
   nodes:
-  - VCTRL
+  - N_VDD
   - GATE
   params:
     R: Rs
@@ -29,28 +35,31 @@ components:
 - id: CP
   type: C
   nodes:
-  - VCTRL
+  - N_VDD
   - '0'
   params:
     C: Cp
   role: shunt
   phase_required: 1
 graph:
-  backbone:
-  - VCTRL
-  - GATE
-  backbone_components:
-  - RS
+  backbone: []
+  backbone_components: []
   shunt_branches:
-  - tap_node: VCTRL
+  - tap_node: N_VDD
     component_id: CP
   switch_arms: []
 metadata:
   warnings: []
-  port_count: 2
-  component_count: 2
+  port_count: 1
+  component_count: 3
   series_count: 1
   shunt_count: 1
   tline_count: 0
   switch_count: 0
-design_variables: []
+design_variables:
+- name: Vgate
+  value: 0.0 V
+- name: Rs
+  value: 1000.0 Ohm
+- name: Cp
+  value: 2272.73 fF

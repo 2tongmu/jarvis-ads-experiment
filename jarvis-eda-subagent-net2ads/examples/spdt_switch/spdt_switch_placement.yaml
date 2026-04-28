@@ -1,6 +1,6 @@
 cell_name: SPDT_SWITCH
-source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
-generation_timestamp: '2026-04-27T00:35:53'
+source_buildplan: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\spdt_switch_research.net
+generation_timestamp: '2026-04-27T20:48:37'
 ports:
 - name: P1
   node: P1
@@ -17,26 +17,6 @@ ports:
   number: 3
   x: 11.875
   y: -2.0
-- name: VCTRL_SW_SERIES_A
-  node: VCTRL_SW_SERIES_A
-  number: 4
-  x: 4.375
-  y: 1.5
-- name: VCTRL_SW_SHUNT_A
-  node: VCTRL_SW_SHUNT_A
-  number: 5
-  x: 7.375
-  y: 1.5
-- name: VCTRL_SW_SERIES_B
-  node: VCTRL_SW_SERIES_B
-  number: 6
-  x: 4.375
-  y: -2.5
-- name: VCTRL_SW_SHUNT_B
-  node: VCTRL_SW_SHUNT_B
-  number: 7
-  x: 7.375
-  y: -2.5
 instances:
 - id: RIN_PAD
   ads_lib: ads_rflib
@@ -210,6 +190,7 @@ instances:
   params:
     Rs: 1000.0 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
 - id: BIAS_SW_SHUNT_A
   ads_lib: net2ads_lib
@@ -221,6 +202,7 @@ instances:
   params:
     Rs: 1040.2 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
 - id: BIAS_SW_SERIES_B
   ads_lib: net2ads_lib
@@ -232,6 +214,7 @@ instances:
   params:
     Rs: 1000.0 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
 - id: BIAS_SW_SHUNT_B
   ads_lib: net2ads_lib
@@ -243,6 +226,7 @@ instances:
   params:
     Rs: 1040.2 Ohm
     Cp: 2272.73 fF
+    Vgate: 0.0 V
   role: fetbias
 wires:
 - id: wire_0
