@@ -237,6 +237,31 @@ def main():
     from translator.ads_mapper       import map_ir_to_buildplan, write_buildplan, load_mapping_config, load_sw_map
     from translator.placement_engine import compute_placement, write_placement
 
+    # ── Pre-Stage 1: Detect and clean stale YAML files ────────────────────────
+    # If netlist is newer than cached YAMLs, delete them to force regeneration.
+    # This ensures YAML artifacts reflect the latest netlist (especially after
+    # netlist topology changes like 2-port → 1-port).
+    def _clean_stale_yamls(net_path: Path, output_dir: Path) -> None:
+        """Delete stale _ir.yaml, _buildplan.yaml, _placement.yaml if netlist is newer."""
+        net_mtime = net_path.stat().st_mtime
+        cell_stem = net_path.stem
+        
+        yaml_files = [
+            output_dir / f"{cell_stem}_ir.yaml",
+            output_dir / f"{cell_stem}_buildplan.yaml",
+            output_dir / f"{cell_stem}_placement.yaml",
+        ]
+        
+        for yaml_file in yaml_files:
+            if yaml_file.exists():
+                yaml_mtime = yaml_file.stat().st_mtime
+                if net_mtime > yaml_mtime:
+                    print(f"  [stale] {yaml_file.name} (netlist is newer)")
+                    yaml_file.unlink()
+    
+    print("\n[Pre-Stage 1] Checking for stale YAML artifacts...")
+    _clean_stale_yamls(net_path, output_dir)
+
     # ── Stage 1: Parse ────────────────────────────────────────────────────────
     print("\n[Stage 1] Parsing netlist...")
     try:
