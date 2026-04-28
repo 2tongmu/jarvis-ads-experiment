@@ -1,0 +1,139 @@
+# ads_pdk/pin_offsets.yaml
+# =========================
+# Pin position offsets relative to instance placed origin (x, y), per component
+# and placement angle. Used by placement_checker.py for exact pin connectivity
+# verification and by placement_engine.py for GND companion placement.
+#
+# Format:
+#   <ads_lib>:<ads_cell>:
+#     pins:
+#       - id: <pin_name>
+#         nodes_idx: <int|null>   # index into BuildInstance.nodes; null = not in nodes list
+#     offsets_by_angle:
+#       "<angle>": [[dx0,dy0], [dx1,dy1], ...]   # one [dx,dy] per pin, same order as pins list
+#     source: probed|formula|confirmed|assumed
+#     notes: <optional explanation>
+#
+# Offset convention:
+#   Pin schematic position = (placed_x + dx, placed_y + dy)
+#   angle=0.0   : default ADS orientation
+#   angle=-90.0 : 90° clockwise rotation  (shunt passives, V_DC)
+#   angle=90.0  : 90° counter-clockwise   (series FET WIN_PP1029_CPW)
+#
+# Source legend:
+#   probed     : measured via ADS Python API (probe_pin_offsets.py)
+#   formula    : computed from standard 2D rotation of probed angle=0 offset
+#   confirmed  : probed + verified end-to-end in ADS schematic
+#   assumed    : not yet probed; based on ADS documentation or convention
+
+pin_offsets:
+
+  # ── Standard 2-pin passives (ads_rflib) ─────────────────────────────────────
+  # Probed: at angle=0, P1 at origin, P2 one unit to the right.
+  # Rotation formula: rotate (dx,dy) by angle θ → (dx·cosθ − dy·sinθ, dx·sinθ + dy·cosθ)
+  # angle=0:   (1,0) → (1,0)
+  # angle=-90: (1,0) → (0,-1)   [90° CW: cos=-90°=0, sin=-90°=-1]
+
+  ads_rflib:R:
+    pins:
+      - {id: P1, nodes_idx: 0}
+      - {id: P2, nodes_idx: 1}
+    offsets_by_angle:
+      "0.0":   [[0.0, 0.0], [1.0,  0.0]]
+      "-90.0": [[0.0, 0.0], [0.0, -1.0]]
+    source: confirmed
+    notes: Confirmed by GND companion at (x, y-1) for shunt at angle=-90
+
+  ads_rflib:L:
+    pins:
+      - {id: P1, nodes_idx: 0}
+      - {id: P2, nodes_idx: 1}
+    offsets_by_angle:
+      "0.0":   [[0.0, 0.0], [1.0,  0.0]]
+      "-90.0": [[0.0, 0.0], [0.0, -1.0]]
+    source: formula
+    notes: Same geometry as R
+
+  ads_rflib:C:
+    pins:
+      - {id: P1, nodes_idx: 0}
+      - {id: P2, nodes_idx: 1}
+    offsets_by_angle:
+      "0.0":   [[0.0, 0.0], [1.0,  0.0]]
+      "-90.0": [[0.0, 0.0], [0.0, -1.0]]
+    source: confirmed
+    notes: Confirmed by GND companion co-location at (x, y-1)
+
+  ads_rflib:GROUND:
+    pins:
+      - {id: P1, nodes_idx: null}    # single pin, connects to ground rail; no IR node
+    offsets_by_angle:
+      "-90.0": [[0.0, 0.0]]
+    source: formula
+    notes: Origin is the schematic connection point; placed 1 unit below shunt companion
+
+  # ── Voltage source (ads_sources) ─────────────────────────────────────────────
+  # V_DC at angle=-90 confirmed 2026-04-28: P+ at origin (signal rail), P- at (0,-1) (GND).
+  # At angle=0, V_DC is horizontal; the +/- terminals are at left/right — do not use.
+  # GND companion placed at (x, y-1) co-locates with P-.
+
+  ads_sources:V_DC:
+    pins:
+      - {id: P_plus,  nodes_idx: 0}   # positive terminal (non-ground node, e.g. N_VDD)
+      - {id: P_minus, nodes_idx: 1}   # negative terminal (ground node '0')
+    offsets_by_angle:
+      "-90.0": [[0.0, 0.0], [0.0, -1.0]]
+    source: confirmed
+    notes: >
+      Only angle=-90 is used in net2ads pipeline (vsource role).
+      P+ at origin connects to signal net; P- at (0,-1) connects to GND companion.
+      angle=0 was found to be 90-deg off — do not use for this component.
+
+  # ── PDK FET: WIN_PP1029_CPW (WIN_PP1029_DESIGN_KIT) ─────────────────────────
+  # 3-pin device: gate (G), drain (D), source (S).
+  # Gate = FET origin (placement point); D and S offsets probed 2026-04-06.
+  # Gate node is NOT in BuildInstance.nodes (only drain and source are).
+  # Gate connectivity is verified separately via fetbias co-location.
+
+  WIN_PP1029_DESIGN_KIT:WIN_PP1029_CPW:
+    pins:
+      - {id: gate,   nodes_idx: null}   # gate at origin; connected via fetbias co-location
+      - {id: drain,  nodes_idx: 0}      # nodes[0] = drain net (N_COM, N_A3, etc.)
+      - {id: source, nodes_idx: 1}      # nodes[1] = source net (N_A1, N_AST, etc.)
+    offsets_by_angle:
+      "90.0":  [[0.0, 0.0], [-0.5,  0.5], [ 0.5,  0.5]]   # series FET (angle=90 CCW)
+      "0.0":   [[0.0, 0.0], [ 0.5,  0.5], [ 0.5, -0.5]]   # shunt  FET (angle=0)
+    source: probed
+    notes: >
+      Probed 2026-04-06 from ADS2026_Update1.2 WIN_PP1029_DESIGN_KIT.
+      series (angle=90): gate at origin, drain upper-left, source upper-right.
+      shunt  (angle=0):  gate at origin, drain upper-right, source lower-right.
+
+  # ── fetbias_sw_gate subcell (net2ads_lib) ────────────────────────────────────
+  # 1-port subcell built by net2ads. GATE is a right-side symbol pin at x=symbol_width=2.0.
+  # Placement: fetbias at (FET_gate_x - 2.0, gate_y) with angle=0.0
+  # → GATE pin at (bias_x + 2.0, bias_y) = (FET_gate_x, gate_y) = FET gate ✓
+  # This was confirmed after fixing port_angles["GATE"]=0.0 (right-side pin).
+
+  net2ads_lib:fetbias_sw_gate:
+    pins:
+      - {id: GATE, nodes_idx: 0}    # nodes[0] = gate net (GATE_SW_SERIES_A, etc.)
+    offsets_by_angle:
+      "0.0": [[2.0, 0.0]]
+    source: confirmed
+    notes: >
+      GATE is a right-side pin at x=symbol_width=2.0 in the dual symbol (port_angles["GATE"]=0.0).
+      Placed at (gate_x-2.0, gate_y) with angle=0 → GATE at (gate_x, gate_y) = FET gate.
+      symbol_width=2.0 is the default in create_dual_symbol.
+
+  # ── PDK microstrip line (WIN_PP1029_DESIGN_KIT) ──────────────────────────────
+  # Assumed same geometry as standard 2-pin passive. To be probed.
+
+  WIN_PP1029_DESIGN_KIT:PP1029_mlin:
+    pins:
+      - {id: P1, nodes_idx: 0}
+      - {id: P2, nodes_idx: 1}
+    offsets_by_angle:
+      "0.0": [[0.0, 0.0], [1.0, 0.0]]
+    source: assumed
+    notes: Not yet probed. Assumed same P1/P2 geometry as ads_rflib:R at angle=0.

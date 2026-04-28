@@ -338,6 +338,24 @@ def _map_component(
             api_status="CONFIRMED",
         ))
 
+    # GND companion for vsource components with a ground node (e.g. V_DC: N_VDD→'0')
+    _gnd_node_set = {"0", "gnd", "ground", "vss"}
+    if ir_comp.role == "vsource" and gnd_config:
+        if any(n.strip().lower() in _gnd_node_set for n in ir_comp.nodes):
+            gnd_name_pattern = gnd_config.get("name_pattern", "GND_{component_id}")
+            gnd_name = gnd_name_pattern.replace("{component_id}", ir_comp.id)
+            instances.append(BuildInstance(
+                id=gnd_name,
+                ads_lib=gnd_config.get("ads_lib", "ads_rflib"),
+                ads_cell=gnd_config.get("ads_cell", "GROUND"),
+                ads_view=gnd_config.get("ads_view", "symbol"),
+                params={},
+                role="gnd",
+                nodes=[],
+                phase_required=1,
+                api_status="CONFIRMED",
+            ))
+
     return instances
 
 

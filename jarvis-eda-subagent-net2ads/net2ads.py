@@ -234,8 +234,9 @@ def main():
     # ── Translator imports ────────────────────────────────────────────────────
     from translator.parser           import parse_research_netlist
     from translator.ir_builder       import build_ir, write_ir
-    from translator.ads_mapper       import map_ir_to_buildplan, write_buildplan, load_mapping_config, load_sw_map
-    from translator.placement_engine import compute_placement, write_placement
+    from translator.ads_mapper        import map_ir_to_buildplan, write_buildplan, load_mapping_config, load_sw_map
+    from translator.placement_engine  import compute_placement, write_placement
+    from translator.placement_checker import check_placement
 
     # ── Pre-Stage 1: Detect and clean stale YAML files ────────────────────────
     # If netlist is newer than cached YAMLs, delete them to force regeneration.
@@ -354,6 +355,17 @@ def main():
             errors.append(w)
     print(f"  written   : {pl_path}")
 
+    # ── Stage 4b: Connectivity check ─────────────────────────────────────────
+    print("\n[Stage 4b] Checking placement connectivity...")
+    check_errors = check_placement(plan_bp, placement)
+    if check_errors:
+        for msg in check_errors:
+            print(f"  {msg}")
+            errors.append(msg)
+        print(f"  connectivity: {len(check_errors)} issue(s) found")
+    else:
+        print("  connectivity: OK — all pins connected")
+
     if dry_run:
         _status(
             status="success" if not errors else "partial",
@@ -400,10 +412,20 @@ def main():
                 "Fix ADS session / workspace setup and retry.", str(exc))
         sys.exit(1)
 
-    port_angles = {
-        p.name: (180.0 if (p.number == 1 or p.name.startswith("VCTRL")) else 0.0)
-        for p in placement.ports
-    }
+    # Port facing directions:
+    #   angle=180 (left-facing): RF input P1, VCTRL bias control pins
+    #   angle=0   (right-facing): RF outputs (P2, P3, ...), GATE pin on fetbias subcell
+    # GATE is port 1 on fetbias_sw_gate but connects to the FET gate on its RIGHT side.
+    # The dual symbol places it at x=symbol_width=2.0 when angle=0, so that
+    # instance at (gate_x-2.0, gate_y) puts GATE at (gate_x, gate_y) = FET gate. ✓
+    port_angles = {}
+    for p in placement.ports:
+        if p.name == "GATE":
+            port_angles[p.name] = 0.0    # right-side: connects to FET gate to the right
+        elif p.number == 1 or p.name.startswith("VCTRL"):
+            port_angles[p.name] = 180.0  # left-side: RF input or bias control
+        else:
+            port_angles[p.name] = 0.0    # right-side: RF outputs
 
     try:
         cell, design = open_or_create_schematic(session, lib, cell_name)

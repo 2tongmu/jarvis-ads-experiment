@@ -132,7 +132,7 @@ def _angle_for(inst: BuildInstance) -> float:
     if inst.role == "tline":
         return ANGLE_TLINE
     if inst.role == "vsource":
-        return ANGLE_SERIES   # voltage source: horizontal (series orientation)
+        return ANGLE_SHUNT   # V_DC: vertical (P1 on signal rail, P2 below → GND companion at y-1)
     if inst.role == "fet_series":
         return 90.0    # drain left, source right, gate below — WIN_PP1029_core.yaml
     if inst.role == "fet_shunt":
@@ -782,9 +782,10 @@ def _route_wires_from_netlist(
             if exit_ and not _is_ground_node(exit_):
                 net_xs.setdefault(exit_, set()).add(round(pi.x + COMP_WIDTH, 6))
 
-        elif bi.role == "shunt":
+        elif bi.role in ("shunt", "vsource"):
             # Only P1 (signal node) contributes to signal-path routing.
-            # P2 (ground) is a vertical wire drawn by place_ground() — omit here.
+            # P2 (ground) is connected via GND companion in placement — omit here.
+            # vsource (e.g. V_DC: N_VDD→'0'): P1 at origin, P2 below — same convention.
             tap_node = next(
                 (n for n in bi.nodes if not _is_ground_node(n)), None
             )
@@ -878,12 +879,19 @@ def _assign_coordinates(
         shunt_x_map[inst.id] = shunt_x
         shunt_xs.append(shunt_x)
 
-    # ── GND companion positions (share x with companion shunt) ────────────────
-    # GND id convention: "GND_{shunt_id}" — match by stripping "GND_" prefix
+    # ── GND companion positions (share x with companion shunt or vsource) ────────
+    # GND id convention: "GND_{companion_id}" — match by stripping "GND_" prefix.
+    # Shunt companions: GND at shunt tap x (P2 of angle=-90 component is 1 unit below P1).
+    # Vsource companions: GND at series_x (P2 of V_DC at angle=0 is 1 unit below P1).
     gnd_x_map: dict = {}
     for gnd in gnds:
         companion_id = gnd.id[4:] if gnd.id.startswith("GND_") else gnd.id
-        gnd_x_map[gnd.id] = shunt_x_map.get(companion_id, FIRST_SHUNT_X)
+        if companion_id in shunt_x_map:
+            gnd_x_map[gnd.id] = shunt_x_map[companion_id]
+        elif companion_id in series_x_map:
+            gnd_x_map[gnd.id] = series_x_map[companion_id]
+        else:
+            gnd_x_map[gnd.id] = FIRST_SHUNT_X
 
     # ── Port x positions ──────────────────────────────────────────────────────
     left_x = PORT_LEFT_X

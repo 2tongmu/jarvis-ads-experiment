@@ -1,6 +1,6 @@
 cell_name: FETBIAS_SW_GATE
-source_file: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
-parse_timestamp: '2026-04-27T20:48:15'
+source_file: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
+parse_timestamp: '2026-04-28T07:19:55'
 phase_required: 3
 ports:
 - name: GATE

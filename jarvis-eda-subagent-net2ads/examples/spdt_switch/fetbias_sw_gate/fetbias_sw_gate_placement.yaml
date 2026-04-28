@@ -1,6 +1,6 @@
 cell_name: FETBIAS_SW_GATE
-source_buildplan: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
-generation_timestamp: '2026-04-27T20:48:15'
+source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
+generation_timestamp: '2026-04-28T07:19:55'
 ports:
 - name: GATE
   node: GATE
@@ -18,6 +18,15 @@ instances:
   params:
     C: Cp
   role: shunt
+- id: GND_VGATE
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  x: 4.875
+  y: -1.0
+  angle: -90.0
+  params: {}
+  role: gnd
 - id: GND_CP
   ads_lib: ads_rflib
   ads_cell: GROUND
@@ -43,7 +52,7 @@ instances:
   ads_view: symbol
   x: 4.875
   y: 0.0
-  angle: 0.0
+  angle: -90.0
   params:
     Vdc: Vgate
   role: vsource
@@ -57,5 +66,14 @@ wires:
     - 2.875
     - 0.0
   note: 'net ''GATE'': (1.375,0.0)->(2.875,0.0)'
+- id: wire_1
+  points:
+  - !!python/tuple
+    - 3.875
+    - 0.0
+  - !!python/tuple
+    - 4.875
+    - 0.0
+  note: 'net ''N_VDD'': (3.875,0.0)->(4.875,0.0)'
 warnings:
 - "[WARN] Series 'VGATE' not reached by backbone BFS \u2014 using fallback x=4.8750"

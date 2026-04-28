@@ -1,6 +1,6 @@
 cell_name: FETBIAS_SW_GATE
-source_ir: C:\Users\jarvis\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
-generation_timestamp: '2026-04-27T20:48:15'
+source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\spdt_switch\fetbias_sw_gate\fetbias_sw_gate_research.net
+generation_timestamp: '2026-04-28T07:19:55'
 phase_required: 3
 ports:
 - name: GATE
@@ -18,6 +18,15 @@ instances:
   - N_VDD
   - '0'
   phase_required: 3
+  api_status: CONFIRMED
+- id: GND_VGATE
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  params: {}
+  role: gnd
+  nodes: []
+  phase_required: 1
   api_status: CONFIRMED
 - id: RS
   ads_lib: ads_rflib

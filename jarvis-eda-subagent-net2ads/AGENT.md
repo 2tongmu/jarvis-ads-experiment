@@ -14,9 +14,10 @@ Translate research-oriented RF circuit netlists into ADS schematic cells — reu
 building blocks suitable for instantiation inside a parent ADS schematic or simulation bench.
 
 The agent receives a research netlist (topology + port definitions + nominal component values),
-passes it through a structured 3-stage translation pipeline, and outputs:
+passes it through a structured 5-stage translation pipeline, and outputs:
 - An ADS schematic cell (schematic + symbol view)
-- Placement artifacts (IR, build plan)
+- Intermediate artifacts (IR, build plan, placement plan)
+- A connectivity check report embedded in the pipeline stdout
 - A traceable log of every mapping decision made
 
 ---
@@ -30,10 +31,9 @@ passes it through a structured 3-stage translation pipeline, and outputs:
 | Map IR elements to ADS library components | ✅ |
 | Apply PDK-aware component substitution (Phase 2+) | ✅ |
 | Generate placement plan with coordinates | ✅ |
+| Run Stage 4b connectivity check against pin_offsets.yaml | ✅ |
 | Execute ADS Python API to build schematic cell | ✅ |
-| Create blackbox symbol for each cell | ✅ |
-| Produce traceable intermediate artifacts | ✅ |
-| Run ads-schematic-checker post-build | ✅ |
+| Create dual-sided blackbox symbol for each cell | ✅ |
 | Report structured status (stage, outputs, errors, next_action) | ✅ |
 
 ---
@@ -47,11 +47,11 @@ passes it through a structured 3-stage translation pipeline, and outputs:
 | Layout / physical design (GDS, DRC, LVS) | Post-schematic stage; separate agent |
 | Full SPICE dialect support | Only the defined research netlist dialect |
 | Parsing ADS-native netlists (lpf_demo.net style) | Different dialect; use ads-netlist-translator |
-| Net label placement (vctrl_A, vctrl_B) | Unconfirmed ADS API; deferred |
-| Bias network computation | Handled by gate_bias_network.py; called externally |
+| Net label placement | Unconfirmed ADS API; deferred |
+| Bias network computation | Handled by fet_bias_preprocessor.py; called externally |
 
-If a request falls outside these boundaries, the agent logs it in MEMORY.md Section 4
-(open issues) and surfaces it for human review — it does not attempt to fill gaps silently.
+If a request falls outside these boundaries, the agent logs it in MEMORY.md and surfaces it
+for human review — it does not attempt to fill gaps silently.
 
 ---
 
@@ -61,8 +61,9 @@ If a request falls outside these boundaries, the agent logs it in MEMORY.md Sect
 |---|---|---|
 | Research netlist | `.net` (custom dialect, see schemas/research_netlist.yaml) | Human / orchestrator |
 | PDK mapping rules | `ads_mapping.yaml` | `schemas/` directory |
-| ADS workspace path | CLI argument or config | Human / orchestrator |
-| Target library name | CLI argument or config | Human / orchestrator |
+| SW annotation (Phase 3) | `<name>_sw_map.yaml` | `fet_bias_preprocessor.py` |
+| ADS workspace path | CLI argument | Human / orchestrator |
+| Target library name | CLI argument (default: `net2ads_lib`) | Human / orchestrator |
 
 ---
 
@@ -70,24 +71,26 @@ If a request falls outside these boundaries, the agent logs it in MEMORY.md Sect
 
 | Artifact | Stage produced | Format |
 |---|---|---|
-| Parsed IR | Stage 1 | `<name>_ir.yaml` |
-| ADS build plan | Stage 2 | `<name>_buildplan.yaml` |
-| Placement plan | Stage 3 | `<name>_placement.yaml` |
-| ADS schematic cell | Stage 3 | ADS library (on disk) |
-| ADS symbol view | Stage 3 | ADS library (on disk) |
-| Checker netlist | Post-build | `<name>_ads_generated.net` |
-| Status block | Every run | stdout (structured) |
+| Parsed IR | Stage 2 | `<name>_ir.yaml` |
+| ADS build plan | Stage 3 | `<name>_buildplan.yaml` |
+| Placement plan | Stage 4 | `<name>_placement.yaml` |
+| Connectivity check report | Stage 4b | stdout (embedded in pipeline log) |
+| ADS schematic cell | Stage 5 | ADS library (on disk) |
+| ADS symbol view | Stage 5 | ADS library (on disk) |
+| Design variable AEL | Stage 5 | `<workspace>/<lib>/<cell>/itemdef.ael` |
+| Status block | Every run | stdout (structured, see PLAYBOOK.md) |
 
 ---
 
-## Supported Input Examples (Initial Development)
+## Supported Input Examples
 
-| File | Topology | Phase |
-|---|---|---|
-| `examples/rc_series_shunt/rc_series_shunt_research.net` | R series + C shunt | Phase 1 |
-| `examples/t_network_lcl/t_network_lcl_research.net` | L-C-L T-network (LPF) | Phase 1 |
-| `examples/two_quarter_wave_lines/two_quarter_wave_lines_research.net` | 2× λ/4 TLIN | Phase 2 |
-| `examples/spdt_switch/spdt_switch_research.net` | 3-port SPDT switch | Phase 3 |
+| File | Topology | Phase | Status |
+|---|---|---|---|
+| `examples/rc_series_shunt/rc_series_shunt_research.net` | R series + C shunt | Phase 1 | ✅ |
+| `examples/t_network_lcl/t_network_lcl_research.net` | L-C-L T-network (LPF) | Phase 1 | ✅ |
+| `examples/two_quarter_wave_lines/two_quarter_wave_lines_research.net` | 2× λ/4 TLIN | Phase 2 | ✅ |
+| `examples/spdt_switch/fetbias_sw_gate/fetbias_sw_gate_research.net` | FET gate bias subcell | Phase 3 | ✅ |
+| `examples/spdt_switch/spdt_switch_research.net` | 3-port SPDT switch with PDK FETs | Phase 3 | ✅ |
 
 ---
 
@@ -95,27 +98,38 @@ If a request falls outside these boundaries, the agent logs it in MEMORY.md Sect
 
 **Interpreter:** ADS-bundled Python only — not system Python.
 
-**Auto-Detection:** The pipeline automatically detects ADS installation by searching for known paths
-in order: Jarvis production → Local dev → Explicit override. See `ENVIRONMENT.md` for full details.
-
-| Machine | Path | Status |
+| Machine | Python path | ADS version |
 |---|---|---|
-| Jarvis (CI/production) | `C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe` | ✅ Active |
-| Local dev | `C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe` | ⚠️ Template |
+| Jarvis (CI/production) | `C:\Program Files\Keysight\ADS2026_Update1\tools\python\python.exe` | ADS2026_Update1 |
+| Local dev | `C:\Program Files\Keysight\ADS2026_Update1.2\tools\python\python.exe` | ADS2026_Update1.2 |
 
-**Setup & troubleshooting:** See `ENVIRONMENT.md` (this directory)
+**Setup & troubleshooting:** See `ENVIRONMENT.md`
 
 **Confirmed API source:** `../jarvis-eda-learning/workspace-scripts/ADS_API_REFERENCE.md`
 
-All ADS Python calls used by the translator must be tagged CONFIRMED in that reference before
-use in production code. Unconfirmed API calls must be isolated with a fallback and flagged
-in MEMORY.md Section 3.
+All ADS Python calls used by the translator are tagged CONFIRMED in that reference.
+Unconfirmed API calls are isolated with a fallback and flagged in MEMORY.md.
+
+---
+
+## Key Configuration Files
+
+| File | Purpose |
+|---|---|
+| `schemas/ads_mapping.yaml` | Research element → ADS cell mapping rules |
+| `ads_pdk/pdk_configs/WIN_PP1029_core.yaml` | PDK FET pin offsets, sizing tables, placement recipes |
+| `ads_pdk/pin_offsets.yaml` | Per-component pin position offsets used by placement_checker |
 
 ---
 
 ## Development Phase
 
-**Current phase:** Phase 1 (passive R/L/C) — active
+**Current phase:** Phase 3 — ✅ complete (signed off 2026-04-28)
 
-Phase advancement is controlled by human review and sign-off in `MEMORY.md` Section 1
-(phase log). The agent does not self-advance phases.
+Phase advancement is controlled by human review and sign-off. The agent does not self-advance phases.
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | Passive R/L/C — ads_rflib only | ✅ Complete |
+| 2 | PDK-aware TLIN mapping (PP1029_mlin) | ✅ Complete |
+| 3 | SPDT with PDK FETs + gate bias subcell | ✅ Complete |
