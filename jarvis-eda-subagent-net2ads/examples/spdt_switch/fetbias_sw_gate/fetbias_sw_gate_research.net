@@ -17,8 +17,8 @@
 ;
 ; Design variables (all parametric, overridable per instance):
 ;   Vgate = gate control voltage (default: 0V for on-state, -1.5V for off-state)
-;   Rs = bias resistor (default: 1000 Ohm for series FET)
-;   Cp = bypass capacitor (default: 2272.73 fF for both)
+;   Rs = bias resistor (default: series FET sizing)
+;   Cp = bypass capacitor
 ;
 ; Default values (series FET, UGW=160.0um):
 ;   Vgate = 0.0 V (on-state)

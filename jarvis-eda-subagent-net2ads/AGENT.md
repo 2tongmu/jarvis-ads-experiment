@@ -121,8 +121,40 @@ Unconfirmed API calls are isolated with a fallback and flagged in MEMORY.md.
 | File | Purpose |
 |---|---|
 | `schemas/ads_mapping.yaml` | Research element → ADS cell mapping rules |
-| `ads_pdk/pdk_configs/WIN_PP1029_core.yaml` | PDK FET pin offsets, sizing tables, placement recipes |
+| `ads_pdk/pdk_configs/WIN_PP1029_core.yaml` | PDK FET pin offsets, sizing tables, placement recipes (PP1029) |
+| `ads_pdk/pdk_configs/WIN_PP15_6X_DESIGN_KIT_core.yaml` | PDK config for WIN PP15 6X process |
+| `ads_pdk/bias_rules/switch_gate_bias.yaml` | RF frequency / switching-speed specs for gate bias Rs/Cp calculation |
 | `ads_pdk/pin_offsets.yaml` | Per-component pin position offsets used by placement_checker |
+| `translator/gate_bias_network.py` | Vendored copy of gate bias calculator (FETParams, BiasSpecs, calculate_bias) |
+
+---
+
+## PDK Selection
+
+PDK is selected at run time via the `--pdk` CLI flag:
+
+```
+python net2ads.py my.net --workspace <path> --pdk WIN_PP1029_DESIGN_KIT
+```
+
+| CLI flag | Effect |
+|---|---|
+| `--pdk WIN_PP1029_DESIGN_KIT` | Enables pdk_override in ads_mapping.yaml for TLIN → PP1029_mlin and SW → WIN_PP1029_CPW |
+| `--pdk WIN_PP15_6X_DESIGN_KIT` | Same mechanism — requires corresponding pdk_override entries in ads_mapping.yaml |
+| *(omitted)* | TLIN maps to ideal `ads_rflib:TLIN`; SW maps to resistive ON/capacitive OFF |
+
+**How it works inside the pipeline:**
+
+1. `net2ads.py --pdk <NAME>` passes the PDK name to `_enable_pdk_override(config, pdk_name)`.
+2. That function patches `ads_mapping.yaml` entries in-memory, setting `pdk_override.enabled = True` for all entries whose `pdk_override.ads_lib == pdk_name`.
+3. `ads_mapper.py` reads the enabled overrides and substitutes the PDK ADS cell (e.g. `WIN_PP1029_CPW`) for the abstract element.
+4. For TLIN: `tline_calc_microstrip` synthesis is triggered using the PDK substrate data from `ads_pdk/pdk_configs/<PDK_NAME>_core.yaml`.
+5. For SW: `fet_bias_preprocessor.py` reads `<PDK_NAME>_core.yaml` for typical NOF/UGW sizing.
+
+**To add a new PDK:**
+- Add `ads_pdk/pdk_configs/<NEW_PDK>_core.yaml` with `component_map`, `placement_recipes`, and `pin_offsets`.
+- Add `pdk_override` entries in `schemas/ads_mapping.yaml` for any element types the new PDK covers.
+- Run with `--pdk <NEW_PDK>`.
 
 ---
 

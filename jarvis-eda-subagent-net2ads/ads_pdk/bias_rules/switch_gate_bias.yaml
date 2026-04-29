@@ -1,0 +1,58 @@
+# switch_gate_bias.yaml
+# Design rules for GaAs pHEMT RF switch gate bias network
+# Process-agnostic — physics constants loaded from process-defaults/
+# FET geometry (ugw, nof) read dynamically from .net file — not hardcoded here
+
+bias_type: switch_gate
+process_defaults: bias-rules/process-defaults/gaas_phemt.yaml
+
+# Target specifications
+# confirmed: f_low, f_high match circuit spec
+# assumed:   t_sw, r_ctrl — reasonable defaults, tune after simulation
+specs:
+  f_low:  2.0     # GHz  confirmed — circuit spec
+  f_high: 18.0    # GHz  confirmed — circuit spec
+  t_sw:   1.0     # ns   assumed — typical switch speed, tune after sim
+  r_ctrl: 50.0    # Ohm  assumed — standard driver impedance, tune after sim
+
+# DC control voltages
+# assumed — typical GaAs pHEMT pinch-off range: -0.3V to -0.8V
+# confirm from Idss vs Vgs sweep in ADS after PDK models are loaded
+control:
+  series_vg_on:   0.0    # V  assumed
+  series_vg_off: -0.5    # V  assumed — confirm from PDK Idss sweep
+  shunt_vg_on:  -0.5     # V  assumed — confirm from PDK Idss sweep
+  shunt_vg_off:  0.0     # V  assumed
+
+# ADS subcell definition
+subcell:
+  name: GBIAS_SWITCH_GATE
+  lib:  GBIAS_CELLS
+  parameters:
+    - name: Rs
+      unit: Ohm
+      description: Gate bias series resistor
+    - name: Cp
+      unit: pF
+      description: RF bypass capacitor at control node
+    - name: Vctrl
+      unit: V
+      description: DC gate control voltage
+
+# Placement (ADS schematic, mils coordinate system)
+placement:
+  offset_x: -200    # mils left of FET gate pin
+  offset_y:   0     # mils vertical offset from FET gate pin
+  rs_width:  200    # mils horizontal span of Rs_bias inside subcell
+  cp_height: 100    # mils vertical span of Cp_bypass inside subcell
+
+# FET roles — control voltages only
+# ugw and nof are read from the .net file per FET instance at runtime
+# add new roles here if topology expands (e.g. series_large, absorptive)
+fet_roles:
+  series:
+    vctrl_on:   0.0    # V  assumed
+    vctrl_off: -0.5    # V  assumed
+  shunt:
+    vctrl_on:  -0.5    # V  assumed
+    vctrl_off:  0.0    # V  assumed
