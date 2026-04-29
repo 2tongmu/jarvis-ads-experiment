@@ -27,6 +27,9 @@ passes it through a structured 5-stage translation pipeline, and outputs:
 | Responsibility | In scope |
 |---|---|
 | Parse research netlist dialect | ✅ |
+| Auto-detect SW elements → run fet_bias_preprocessor (Phase 3) | ✅ |
+| Generate `_sw_map.yaml` and `fetbias_sw_gate_research.net` | ✅ |
+| Auto-build `fetbias_sw_gate` subcell before parent SPDT cell | ✅ |
 | Normalize into internal representation (IR) | ✅ |
 | Map IR elements to ADS library components | ✅ |
 | Apply PDK-aware component substitution (Phase 2+) | ✅ |
@@ -48,7 +51,7 @@ passes it through a structured 5-stage translation pipeline, and outputs:
 | Full SPICE dialect support | Only the defined research netlist dialect |
 | Parsing ADS-native netlists (lpf_demo.net style) | Different dialect; use ads-netlist-translator |
 | Net label placement | Unconfirmed ADS API; deferred |
-| Bias network computation | Handled by fet_bias_preprocessor.py; called externally |
+| Bias network for amplifiers | Switch bias is auto-handled; amplifier bias needs a new `_classify_amp_roles()` in `fet_bias_preprocessor.py` |
 
 If a request falls outside these boundaries, the agent logs it in MEMORY.md and surfaces it
 for human review — it does not attempt to fill gaps silently.
@@ -61,9 +64,9 @@ for human review — it does not attempt to fill gaps silently.
 |---|---|---|
 | Research netlist | `.net` (custom dialect, see schemas/research_netlist.yaml) | Human / orchestrator |
 | PDK mapping rules | `ads_mapping.yaml` | `schemas/` directory |
-| SW annotation (Phase 3) | `<name>_sw_map.yaml` | `fet_bias_preprocessor.py` |
 | ADS workspace path | CLI argument | Human / orchestrator |
 | Target library name | CLI argument (default: `net2ads_lib`) | Human / orchestrator |
+| SW map override (optional) | `--sw-map <path>` | Only needed if re-using a previously generated sw_map |
 
 ---
 
@@ -91,6 +94,7 @@ for human review — it does not attempt to fill gaps silently.
 | `examples/two_quarter_wave_lines/two_quarter_wave_lines_research.net` | 2× λ/4 TLIN | Phase 2 | ✅ |
 | `examples/spdt_switch/fetbias_sw_gate/fetbias_sw_gate_research.net` | FET gate bias subcell | Phase 3 | ✅ |
 | `examples/spdt_switch/spdt_switch_research.net` | 3-port SPDT switch with PDK FETs | Phase 3 | ✅ |
+| `examples/2stage_spdt_switch/2stage_spdt_switch_research.net` | 2-stage SPDT (2× series FETs per path) | Phase 3 | ⏳ |
 
 ---
 

@@ -21,39 +21,96 @@ The session object carries:
     session.TermType    — TermType enum  (from _pde.db, confirmed import path)
     session.ads_dir     — resolved ADS installation path used
 
-ADS Python interpreter paths:
-    Jarvis (CI):    C:/Program Files/Keysight/ADS2026_Update1/tools/python/python.exe
-    Local dev:      C:/Program Files/Keysight/ADS2026_Update1.2/tools/python/python.exe
+ADS installation is discovered automatically by scanning the Keysight install
+directory for ADS* subdirectories, sorted newest-first by version year.
+A minimum version of ADS2023 is required for the Python API features used here.
+An explicit path can always be passed to override discovery.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
 
-
-# Default search order for ADS installation directories.
-# The first path that exists and contains the packages directory is used.
-_ADS_CANDIDATE_DIRS = [
-    r"C:\Program Files\Keysight\ADS2026_Update1",
-    r"C:\Program Files\Keysight\ADS2026_Update1.2",
-]
-
 _PACKAGES_SUBPATH = Path("tools") / "python" / "packages"
+
+# Minimum ADS release year required for confirmed Python API compatibility.
+_MIN_ADS_YEAR = 2023
+
+# Root directory where Keysight installs ADS on Windows.
+_KEYSIGHT_ROOT = Path(r"C:\Program Files\Keysight")
+
+
+def _parse_ads_version(dirname: str) -> tuple:
+    """
+    Parse a version sort key from an ADS install directory name.
+
+    Examples:
+        "ADS2026_Update1.2" → (2026, 1, 2)
+        "ADS2025_Update2"   → (2025, 2, 0)
+        "ADS2024"           → (2024, 0, 0)
+
+    Returns (0, 0, 0) for names that don't match the pattern.
+    """
+    m = re.match(r"ADS(\d{4})(?:_Update(\d+)(?:\.(\d+))?)?", dirname, re.IGNORECASE)
+    if not m:
+        return (0, 0, 0)
+    year   = int(m.group(1))
+    update = int(m.group(2)) if m.group(2) else 0
+    patch  = int(m.group(3)) if m.group(3) else 0
+    return (year, update, patch)
+
+
+def _discover_ads_dirs() -> list:
+    """
+    Scan the Keysight install root for ADS installation directories.
+
+    Returns a list of Path objects sorted newest-first (highest version first).
+    Only directories that contain the expected Python packages subtree are included.
+    """
+    if not _KEYSIGHT_ROOT.is_dir():
+        return []
+
+    candidates = []
+    for entry in _KEYSIGHT_ROOT.iterdir():
+        if not entry.is_dir():
+            continue
+        if not entry.name.upper().startswith("ADS"):
+            continue
+        if not (entry / _PACKAGES_SUBPATH).exists():
+            continue
+        ver = _parse_ads_version(entry.name)
+        if ver[0] == 0:
+            continue  # unrecognised name format
+        candidates.append((ver, entry))
+
+    # Sort newest version first
+    candidates.sort(key=lambda t: t[0], reverse=True)
+    return [path for _, path in candidates]
 
 
 def _find_ads_dir(explicit: Optional[str] = None) -> Optional[Path]:
-    """Return the first valid ADS directory, or None if none found."""
-    candidates = [explicit] if explicit else []
-    candidates += _ADS_CANDIDATE_DIRS
+    """
+    Return the best available ADS installation directory, or None.
 
-    for candidate in candidates:
-        if candidate is None:
-            continue
-        p = Path(candidate)
+    Resolution order:
+      1. explicit path (if provided) — used as-is, no version check
+      2. auto-discovered paths (newest first) — minimum version enforced
+    """
+    if explicit:
+        p = Path(explicit)
         if (p / _PACKAGES_SUBPATH).exists():
             return p
+        return None
+
+    for ads_path in _discover_ads_dirs():
+        ver = _parse_ads_version(ads_path.name)
+        if ver[0] < _MIN_ADS_YEAR:
+            continue  # too old — skip
+        return ads_path  # first (newest) valid path
+
     return None
 
 
@@ -110,10 +167,20 @@ def get_ads_session(ads_dir: Optional[str] = None, force_reinit: bool = False) -
     # ── Locate ADS installation ───────────────────────────────────────────────
     found_dir = _find_ads_dir(ads_dir)
     if found_dir is None:
-        checked = [ads_dir] + _ADS_CANDIDATE_DIRS if ads_dir else _ADS_CANDIDATE_DIRS
+        if ads_dir:
+            detail = f"  explicit path: {ads_dir}"
+        else:
+            discovered = _discover_ads_dirs()
+            if discovered:
+                detail = (
+                    f"  Found ADS installs but none meet minimum year ADS{_MIN_ADS_YEAR}:\n"
+                    + "\n".join(f"    {p}" for p in discovered)
+                )
+            else:
+                detail = f"  No ADS* directories found under {_KEYSIGHT_ROOT}"
         raise EnvironmentError(
-            "ADS Python packages not found. Checked:\n"
-            + "\n".join(f"  {p}" for p in checked if p)
+            "ADS Python packages not found.\n"
+            + detail
             + "\nRun this script with the ADS-bundled Python interpreter."
         )
 

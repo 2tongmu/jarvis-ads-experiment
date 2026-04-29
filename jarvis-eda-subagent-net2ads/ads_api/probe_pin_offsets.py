@@ -7,8 +7,9 @@ registered in ads_pdk/pin_offsets.yaml and writes the results back.
 Run this whenever a new component is added to ads_mapping.yaml or
 when the ADS version changes and pin geometry may have shifted.
 
-Must be run with the ADS-bundled Python interpreter:
-  C:\\Program Files\\Keysight\\ADS2026_Update1.2\\tools\\python\\python.exe
+Must be run with the ADS-bundled Python interpreter.
+The ADS installation is discovered automatically (newest ADS >= ADS2023 wins).
+Example path: C:\\Program Files\\Keysight\\ADS2026_Update1.2\\tools\\python\\python.exe
 
 Usage:
     python ads_api/probe_pin_offsets.py \\
@@ -182,7 +183,15 @@ def main():
         print(f"  {key}")
 
     # ── ADS setup ─────────────────────────────────────────────────────────────
-    ads_dir = r"C:\Program Files\Keysight\ADS2026_Update1.2"
+    # Discover ADS installation dynamically (same logic as ads_session.py).
+    from ads_api.ads_session import _discover_ads_dirs, _MIN_ADS_YEAR
+    ads_candidates = _discover_ads_dirs()
+    ads_path = next((p for p in ads_candidates if int(p.name[3:7]) >= _MIN_ADS_YEAR), None)
+    if ads_path is None:
+        print(f"[probe] ERROR: no ADS >= ADS{_MIN_ADS_YEAR} found in C:\\Program Files\\Keysight\\")
+        sys.exit(1)
+    ads_dir = str(ads_path)
+    print(f"[probe] ADS installation: {ads_dir}")
     import warnings as _warnings
     de, db, DesignMode = _setup_probe_env(ads_dir)
 

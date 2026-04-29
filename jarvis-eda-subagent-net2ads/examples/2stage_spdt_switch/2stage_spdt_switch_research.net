@@ -1,0 +1,95 @@
+; ================================================================
+; 2stage_spdt_switch_research.net
+; Research netlist -- 2-stage SPDT switch
+; Purpose: Phase 3 verification example for net2ads pipeline
+; Scope: topology + ports + nominal values only, no simulation setup
+;
+; Topology intent:
+;   SPDT with one input port (P1) and two output ports (P2, P3).
+;   Each path uses TWO series switches in cascade (2-stage insertion
+;   loss improvement) with inter-stage R/L matching and one shunt
+;   switch at the output for isolation.
+;
+; Compared to single-stage spdt_switch:
+;   - Adds SW_SERIES_A2 / SW_SERIES_B2 (second series FET per path)
+;   - Adds RMATCH_A / LMATCH_A inter-stage matching networks
+;   - Tests that placement_engine correctly chains series FETs
+;     and that connectivity checker passes all intermediate nodes
+;
+; State annotation for this example:
+;   Path A active: P1 -> P2  (both series FETs ON, shunt FET OFF)
+;   Path B off:    P1 -/-> P3 (both series FETs OFF, shunt FET ON)
+;
+; Notes:
+;   SW elements are placeholders resolved by fet_bias_preprocessor.py
+;   via the companion 2stage_spdt_switch_sw_map.yaml.
+; ================================================================
+
+.SUBCKT TWO_STAGE_SPDT_SWITCH P1 P2 P3 0
+
+; -- Ports -------------------------------------------------------
+PORT:P1  P1
+PORT:P2  P2
+PORT:P3  P3
+
+; ================================================================
+; COMMON INPUT NODE
+; ================================================================
+R:RIN_PAD   P1      N_IN    R=0.05 Ohm
+L:LIN_PAD   N_IN    N_COM   L=10 pH
+
+; ================================================================
+; PATH A -- active branch to P2
+;   Stage 1: SW_SERIES_A1 ON
+;   Inter-stage: R/L matching network
+;   Stage 2: SW_SERIES_A2 ON
+;   Output shunt: SW_SHUNT_A OFF (path active)
+; ================================================================
+; Stage 1 series switch
+SW:SW_SERIES_A1   N_COM   N_A1    State=ON
+
+; Inter-stage matching (between the two series switches)
+R:RMATCH_A        N_A1    N_A1R   R=0.05 Ohm
+L:LMATCH_A        N_A1R   N_A1L   L=20 pH
+
+; Stage 2 series switch
+SW:SW_SERIES_A2   N_A1L   N_A2    State=ON
+
+; Output path resistor (bonding pad / metal resistance)
+R:RPATH_A         N_A2    N_A3    R=0.10 Ohm
+
+; Output shunt: OFF when path A is active
+SW:SW_SHUNT_A     N_A3    N_AST   State=OFF
+R:RTERM_A         N_AST   0       R=50 Ohm
+
+; Output port
+R:ROUT_A          N_A3    P2      R=0.05 Ohm
+
+; ================================================================
+; PATH B -- off branch to P3
+;   Stage 1: SW_SERIES_B1 OFF
+;   Inter-stage: R/L matching network
+;   Stage 2: SW_SERIES_B2 OFF
+;   Output shunt: SW_SHUNT_B ON (path off, providing isolation)
+; ================================================================
+; Stage 1 series switch
+SW:SW_SERIES_B1   N_COM   N_B1    State=OFF
+
+; Inter-stage matching
+R:RMATCH_B        N_B1    N_B1R   R=0.05 Ohm
+L:LMATCH_B        N_B1R   N_B1L   L=20 pH
+
+; Stage 2 series switch
+SW:SW_SERIES_B2   N_B1L   N_B2    State=OFF
+
+; Output path resistor
+R:RPATH_B         N_B2    N_B3    R=0.10 Ohm
+
+; Output shunt: ON when path B is off (provides isolation)
+SW:SW_SHUNT_B     N_B3    N_BST   State=ON
+R:RTERM_B         N_BST   0       R=50 Ohm
+
+; Output port
+R:ROUT_B          N_B3    P3      R=0.05 Ohm
+
+.ENDS TWO_STAGE_SPDT_SWITCH

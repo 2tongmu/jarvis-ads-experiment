@@ -79,10 +79,12 @@ def _parse_args():
                         "PDK microstrip cell. PDK lib.defs must exist at "
                         "ads_pdk/<PDK_NAME>/lib.defs relative to the net2ads root.")
     p.add_argument("--sw-map", default=None, metavar="SW_MAP_YAML",
-                   help="Path to SW annotation YAML produced by fet_bias_preprocessor.py "
+                   help="Optional: path to a pre-existing SW annotation YAML "
                         "(e.g. examples/spdt_switch/spdt_switch_sw_map.yaml). "
-                        "Enables Phase 3 FET substitution: SW elements map to "
-                        "WIN_PP1029_CPW FETs + fetbias_sw_gate subcells.")
+                        "If omitted and the netlist contains SW elements, "
+                        "fet_bias_preprocessor.py is run automatically to generate it. "
+                        "Pass this flag only to reuse a previously generated sw_map "
+                        "without re-running the preprocessor.")
     return p.parse_args()
 
 
@@ -173,6 +175,90 @@ def _setup_workspace_files(ws_path: Path, lib_name: str) -> Path:
     return lib_path
 
 
+# ── Subcell builder (dependency pre-build) ────────────────────────────────────
+
+def _build_subcell(session, lib, lib_name: str, ws_path: Path,
+                   net_path: Path, pdk_name: Optional[str], dry_run: bool) -> None:
+    """
+    Build a dependency subcell using an already-open ADS session.
+
+    Runs the full 5-stage pipeline for net_path without reopening the workspace.
+    Used to pre-build fetbias_sw_gate before the parent SPDT cell.
+
+    Raises on failure (caller handles sys.exit).
+    """
+    from translator.parser            import parse_research_netlist
+    from translator.ir_builder        import build_ir, write_ir
+    from translator.ads_mapper        import map_ir_to_buildplan, write_buildplan, load_mapping_config
+    from translator.placement_engine  import compute_placement, write_placement
+    from translator.placement_checker import check_placement
+    from ads_api.cell_ops      import open_or_create_schematic, save_design, commit_design, write_itemdef_ael
+    from ads_api.schematic_ops import place_port, place_instance, connect
+    from ads_api.symbol_ops    import create_dual_symbol
+
+    output_dir = net_path.parent
+
+    # Stale YAML cleanup
+    for suffix in ("_ir.yaml", "_buildplan.yaml", "_placement.yaml"):
+        p = output_dir / (net_path.stem + suffix)
+        if p.exists() and net_path.stat().st_mtime > p.stat().st_mtime:
+            p.unlink()
+
+    # Stages 1-4
+    parsed    = parse_research_netlist(net_path)
+    cell_name = parsed.cell_name.lower()
+    ir        = build_ir(parsed)
+    write_ir(ir, output_dir)
+
+    config = load_mapping_config(MAPPING_CONFIG)
+    if pdk_name:
+        _enable_pdk_override(config, pdk_name)
+    plan_bp = map_ir_to_buildplan(ir, config, sw_map=None)
+    write_buildplan(plan_bp, output_dir)
+
+    placement = compute_placement(plan_bp)
+    write_placement(placement, output_dir)
+
+    for msg in check_placement(plan_bp, placement):
+        print(f"    [sub-build check] {msg}")
+
+    if dry_run:
+        print(f"    [sub-build] dry-run — skipping ADS build of {cell_name}")
+        return
+
+    # Stage 5 — use already-open session, skip workspace setup
+    port_angles = {}
+    for p in placement.ports:
+        if p.name == "GATE":
+            port_angles[p.name] = 0.0
+        elif p.number == 1 or p.name.startswith("VCTRL"):
+            port_angles[p.name] = 180.0
+        else:
+            port_angles[p.name] = 0.0
+
+    cell, design = open_or_create_schematic(session, lib, cell_name)
+    for port in sorted(placement.ports, key=lambda p: p.number):
+        place_port(session, design, port.name,
+                   x=port.x, y=port.y, angle=port_angles[port.name])
+    for inst in placement.instances:
+        place_instance(session, design, inst)
+    for wire in placement.wires:
+        connect(design, wire.points)
+    if plan_bp.design_variables:
+        design.cell.write_design_variables(plan_bp.design_variables)
+    commit_design(session, design)
+    save_design(design)
+    print(f"    [sub-build] {lib_name}:{cell_name}:schematic  saved")
+
+    create_dual_symbol(session, lib, lib_name, cell, cell_name, design,
+                       port_angles=port_angles)
+    print(f"    [sub-build] {lib_name}:{cell_name}:symbol     saved")
+
+    if plan_bp.design_variables:
+        write_itemdef_ael(ws_path / lib_name / cell_name,
+                          cell_name, plan_bp.design_variables)
+
+
 # ── Status block ───────────────────────────────────────────────────────────────
 
 def _status(status: str, stage: int, outputs: list, next_action: str, errors) -> None:
@@ -220,6 +306,39 @@ def main():
     lib_name   = args.lib
     outputs: list = []
     errors:  list = []
+
+    # ── Auto-preprocessing: detect SW elements → generate sw_map + fetbias ─────
+    # If the netlist has SW: elements and no --sw-map was provided, run
+    # fet_bias_preprocessor to generate _sw_map.yaml and fetbias_sw_gate.net
+    # before entering the main 5-stage pipeline. This keeps the orchestrator
+    # interface simple: hand the sub-agent a .net file, get an ADS cell back.
+    fetbias_net_path: Optional[Path] = None
+    if not args.sw_map:
+        from translator.fet_bias_preprocessor import _parse_sw_elements, process_switch_netlist
+        raw_sw = _parse_sw_elements(net_path)
+        if raw_sw:
+            print(f"\n[Pre-Stage] {len(raw_sw)} SW element(s) detected "
+                  "— running fet_bias_preprocessor...")
+            try:
+                process_switch_netlist(net_path)
+            except Exception as exc:
+                print(f"  [ERROR] Preprocessor failed: {exc}")
+                _status("failed", 0, [], "Fix netlist or PDK config and retry.", str(exc))
+                sys.exit(1)
+            stem = net_path.stem.replace("_research", "")
+            sw_map_auto = net_path.parent / f"{stem}_sw_map.yaml"
+            if sw_map_auto.exists():
+                args.sw_map = str(sw_map_auto)
+                print(f"  [sw_map]  auto-generated: {sw_map_auto.name}")
+            fetbias_net = net_path.parent / "fetbias_sw_gate" / "fetbias_sw_gate_research.net"
+            if fetbias_net.exists():
+                fetbias_net_path = fetbias_net
+                print(f"  [fetbias] auto-generated: fetbias_sw_gate/fetbias_sw_gate_research.net")
+    else:
+        # sw_map provided explicitly; fetbias may already exist alongside parent
+        fetbias_net = net_path.parent / "fetbias_sw_gate" / "fetbias_sw_gate_research.net"
+        if fetbias_net.exists():
+            fetbias_net_path = fetbias_net
 
     print()
     print("=" * 66)
@@ -301,13 +420,16 @@ def main():
             "microstrip component, or run without --pdk to use ideal TLIN (UNCONFIRMED)."
         )
     elif ir.phase_required > 2:
-        # Phase 3 can have V (voltage sources) or SW (switches).
-        # V elements don't require --sw-map, but SW elements do.
+        # Phase 3: may have V (voltage sources) or SW (switches).
+        # SW elements are handled by the auto-preprocessor above.
+        # V elements (vsource/fetbias) need no sw_map.
         has_sw = any(c.type == "SW" for c in ir.components)
         if has_sw and not args.sw_map:
+            # Should not reach here: preprocessor above sets args.sw_map.
+            # Guard for edge case (e.g. preprocessor write failed).
             errors.append(
-                f"Netlist has SW elements (Phase 3). "
-                "Provide --sw-map to enable FET substitution."
+                "SW elements present but sw_map could not be generated. "
+                "Check PDK config paths and retry."
             )
 
     # ── Stage 3: Map to build plan ────────────────────────────────────────────
@@ -411,6 +533,36 @@ def main():
         _status("partial", 3, outputs,
                 "Fix ADS session / workspace setup and retry.", str(exc))
         sys.exit(1)
+
+    # ── Pre-build fetbias_sw_gate if this cell needs it ───────────────────────
+    # The build plan may reference net2ads_lib:fetbias_sw_gate as a subcell.
+    # If that cell doesn't exist in the library yet, build it now using the
+    # already-open session (no second workspace open needed).
+    needs_fetbias = any(
+        bi.ads_lib == "net2ads_lib" and bi.ads_cell == "fetbias_sw_gate"
+        for bi in plan_bp.instances
+    )
+    if needs_fetbias:
+        if lib.cell_exists("fetbias_sw_gate"):
+            print("  [fetbias] fetbias_sw_gate already in library — reusing")
+        elif fetbias_net_path:
+            print("  [fetbias] Building fetbias_sw_gate dependency...")
+            try:
+                _build_subcell(session, lib, lib_name, ws_path,
+                               fetbias_net_path, None, dry_run)
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                _status("partial", 3, outputs,
+                        "fetbias_sw_gate pre-build failed — check output above.", str(exc))
+                sys.exit(1)
+        else:
+            print("  [ERROR] fetbias_sw_gate not in library and netlist not found.")
+            _status("failed", 3, outputs,
+                    "Re-run without --sw-map to trigger auto-preprocessing, "
+                    "which generates fetbias_sw_gate_research.net alongside the parent netlist.",
+                    "fetbias_sw_gate missing")
+            sys.exit(1)
 
     # Port facing directions:
     #   angle=180 (left-facing): RF input P1, VCTRL bias control pins
