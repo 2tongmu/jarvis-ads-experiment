@@ -1,0 +1,337 @@
+cell_name: TWO_STAGE_SPDT_SWITCH
+source_ir: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\2stage_spdt_switch\2stage_spdt_switch_research.net
+generation_timestamp: '2026-04-29T01:54:43'
+phase_required: 3
+ports:
+- name: P1
+  node: P1
+  number: 1
+- name: P2
+  node: P2
+  number: 2
+- name: P3
+  node: P3
+  number: 3
+instances:
+- id: RIN_PAD
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.05 Ohm
+  role: series
+  nodes:
+  - P1
+  - N_IN
+  phase_required: 1
+  api_status: CONFIRMED
+- id: LIN_PAD
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  params:
+    L: 10 pH
+  role: series
+  nodes:
+  - N_IN
+  - N_COM
+  phase_required: 1
+  api_status: CONFIRMED
+- id: Q_SW_SERIES_A1
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+  nodes:
+  - N_COM
+  - N_A1
+  phase_required: 3
+  api_status: UNCONFIRMED
+- id: BIAS_SW_SERIES_A1
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+  nodes:
+  - GATE_SW_SERIES_A1
+  phase_required: 3
+  api_status: CONFIRMED 2026-04-27
+- id: RMATCH_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.05 Ohm
+  role: series
+  nodes:
+  - N_A1
+  - N_A1R
+  phase_required: 1
+  api_status: CONFIRMED
+- id: LMATCH_A
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  params:
+    L: 20 pH
+  role: series
+  nodes:
+  - N_A1R
+  - N_A1L
+  phase_required: 1
+  api_status: CONFIRMED
+- id: Q_SW_SERIES_A2
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+  nodes:
+  - N_A1L
+  - N_A2
+  phase_required: 3
+  api_status: UNCONFIRMED
+- id: BIAS_SW_SERIES_A2
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+  nodes:
+  - GATE_SW_SERIES_A2
+  phase_required: 3
+  api_status: CONFIRMED 2026-04-27
+- id: RPATH_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.10 Ohm
+  role: series
+  nodes:
+  - N_A2
+  - N_A3
+  phase_required: 1
+  api_status: CONFIRMED
+- id: Q_SW_SHUNT_A
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  params:
+    NOF: '2'
+    UGW: 100 um
+  role: fet_shunt
+  nodes:
+  - N_A3
+  - N_AST
+  phase_required: 3
+  api_status: UNCONFIRMED
+- id: BIAS_SW_SHUNT_A
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  params:
+    Rs: 1040.2 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+  nodes:
+  - GATE_SW_SHUNT_A
+  phase_required: 3
+  api_status: CONFIRMED 2026-04-27
+- id: RTERM_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 50 Ohm
+  role: shunt
+  nodes:
+  - N_AST
+  - '0'
+  phase_required: 1
+  api_status: CONFIRMED
+- id: GND_RTERM_A
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  params: {}
+  role: gnd
+  nodes: []
+  phase_required: 1
+  api_status: CONFIRMED
+- id: ROUT_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.05 Ohm
+  role: series
+  nodes:
+  - N_A3
+  - P2
+  phase_required: 1
+  api_status: CONFIRMED
+- id: Q_SW_SERIES_B1
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+  nodes:
+  - N_COM
+  - N_B1
+  phase_required: 3
+  api_status: UNCONFIRMED
+- id: BIAS_SW_SERIES_B1
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+  nodes:
+  - GATE_SW_SERIES_B1
+  phase_required: 3
+  api_status: CONFIRMED 2026-04-27
+- id: RMATCH_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.05 Ohm
+  role: series
+  nodes:
+  - N_B1
+  - N_B1R
+  phase_required: 1
+  api_status: CONFIRMED
+- id: LMATCH_B
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  params:
+    L: 20 pH
+  role: series
+  nodes:
+  - N_B1R
+  - N_B1L
+  phase_required: 1
+  api_status: CONFIRMED
+- id: Q_SW_SERIES_B2
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+  nodes:
+  - N_B1L
+  - N_B2
+  phase_required: 3
+  api_status: UNCONFIRMED
+- id: BIAS_SW_SERIES_B2
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+  nodes:
+  - GATE_SW_SERIES_B2
+  phase_required: 3
+  api_status: CONFIRMED 2026-04-27
+- id: RPATH_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.10 Ohm
+  role: series
+  nodes:
+  - N_B2
+  - N_B3
+  phase_required: 1
+  api_status: CONFIRMED
+- id: Q_SW_SHUNT_B
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  params:
+    NOF: '2'
+    UGW: 100 um
+  role: fet_shunt
+  nodes:
+  - N_B3
+  - N_BST
+  phase_required: 3
+  api_status: UNCONFIRMED
+- id: BIAS_SW_SHUNT_B
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  params:
+    Rs: 1040.2 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+  nodes:
+  - GATE_SW_SHUNT_B
+  phase_required: 3
+  api_status: CONFIRMED 2026-04-27
+- id: RTERM_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 50 Ohm
+  role: shunt
+  nodes:
+  - N_BST
+  - '0'
+  phase_required: 1
+  api_status: CONFIRMED
+- id: GND_RTERM_B
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  params: {}
+  role: gnd
+  nodes: []
+  phase_required: 1
+  api_status: CONFIRMED
+- id: ROUT_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  params:
+    R: 0.05 Ohm
+  role: series
+  nodes:
+  - N_B3
+  - P3
+  phase_required: 1
+  api_status: CONFIRMED
+design_variables: []
+warnings:
+- '[INFO] Backbone trace skipped for 3-port topology (''P1'' -> ''P2''). Expected
+  for SPDT circuits.'

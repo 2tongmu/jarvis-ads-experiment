@@ -159,6 +159,11 @@ def _partition_spdt_paths(
     Partition non-FET/non-fetbias instances into (common, path_a, path_b) by
     BFS from each RF output port (P2=path_a, P3=path_b).
 
+    Supports multi-stage topologies (multiple series FETs per path): the SPDT
+    junction node (N_COM) is detected dynamically and used as the BFS boundary
+    so that elements between cascaded series FETs are correctly assigned to
+    their path rather than the common section.
+
     Returns:
         common_insts   : list[BuildInstance] — P1 → branch point
         path_a_insts   : list[BuildInstance] — branch → P2 (series + shunts)
@@ -166,6 +171,8 @@ def _partition_spdt_paths(
         path_a_shunts  : list[BuildInstance] — shunt branches on Path A
         path_b_shunts  : list[BuildInstance] — shunt branches on Path B
     """
+    from collections import deque
+
     # RF ports: P1, P2, P3 (exclude VCTRL ports)
     rf_ports = [p for p in build_plan.ports if not p.name.startswith("VCTRL")]
     port_by_number = {p.number: p for p in rf_ports}
@@ -178,39 +185,66 @@ def _partition_spdt_paths(
         i for i in build_plan.instances
         if i.role in ("series", "shunt", "switch", "gnd")
     ]
+    all_series_fets = [i for i in build_plan.instances if i.role == "fet_series"]
 
-    # Build adjacency for series/switch instances AND fet_shunt FETs (for path tracing).
-    # fet_shunt is included so that shunt termination resistors behind them
-    # (e.g. RTERM_A behind Q_SW_SHUNT_A via N_A3→N_AST) are reachable from the
-    # output ports when checking shunt tap nodes.
-    # fet_series is NOT included: traversing through series FETs would absorb the
-    # common input section (P1→N_COM) into Path A, breaking the path partition.
-    traversal_insts = regular + [
+    # ── Detect N_COM (SPDT junction): forward BFS from P1 through passive/switch
+    # elements only. N_COM = the node at the end of the common section that
+    # connects to one or more series FETs.  For single-stage SPDT this is the
+    # one node shared by SW_SERIES_A and SW_SERIES_B; for multi-stage it is the
+    # node shared by SW_SERIES_A1 and SW_SERIES_B1 (the first FET of each path).
+    n_com_node: str = None
+    if p1_node and all_series_fets:
+        passive_adj: dict = {}
+        for inst in regular:
+            if inst.role in ("series", "switch") and len(inst.nodes) >= 2:
+                n0, n1 = inst.nodes[0], inst.nodes[1]
+                passive_adj.setdefault(n0, []).append(n1)
+                passive_adj.setdefault(n1, []).append(n0)
+        visited_p1 = {p1_node}
+        queue_p1 = deque([p1_node])
+        while queue_p1:
+            n = queue_p1.popleft()
+            for nb in passive_adj.get(n, []):
+                if nb not in visited_p1:
+                    visited_p1.add(nb)
+                    queue_p1.append(nb)
+        # N_COM = node reachable from P1 (passive only) that also appears in a series FET
+        fet_nodes = {nd for f in all_series_fets for nd in f.nodes}
+        candidates = visited_p1 & fet_nodes - {p1_node}
+        if candidates:
+            n_com_node = next(iter(candidates))
+
+    # ── Build full adjacency (including fet_series and fet_shunt) for path BFS.
+    # Using N_COM as the stop boundary prevents path A/B BFS from bleeding through
+    # the common section and absorbing each other's elements.
+    full_traversal = regular + [
         i for i in build_plan.instances
-        if i.role == "fet_shunt"
+        if i.role in ("fet_series", "fet_shunt")
     ]
     adj: dict = {}
-    for inst in traversal_insts:
-        if inst.role in ("series", "switch", "fet_shunt") and len(inst.nodes) >= 2:
+    for inst in full_traversal:
+        if inst.role not in ("gnd",) and len(inst.nodes) >= 2:
             n0, n1 = inst.nodes[0], inst.nodes[1]
             adj.setdefault(n0, []).append((inst, n1))
             adj.setdefault(n1, []).append((inst, n0))
 
     def _reachable_from(start_node: str, exclude_nodes: set) -> tuple:
         """
-        BFS from start_node (excluding certain nodes).
+        BFS from start_node (excluding certain nodes and ground nodes).
+        Ground nodes are never traversed — they are shared across all paths and
+        would otherwise allow BFS to bleed from one path's shunt resistor through
+        GND into the other path's shunt resistor (N_AST→"0"→N_BST contamination).
         Returns (visited_inst_ids: set, visited_nodes: set).
-        visited_inst_ids includes series/FET IDs traversed.
-        visited_nodes is used to classify shunt components by their tap node.
         """
-        from collections import deque
         visited_nodes = {start_node}
         visited_insts = set()
         queue = deque([start_node])
         while queue:
             node = queue.popleft()
             for inst, neighbor in adj.get(node, []):
-                if neighbor not in exclude_nodes and neighbor not in visited_nodes:
+                if (neighbor not in exclude_nodes
+                        and neighbor not in visited_nodes
+                        and not _is_ground_node(neighbor)):
                     visited_nodes.add(neighbor)
                     visited_insts.add(inst.id)
                     queue.append(neighbor)
@@ -218,10 +252,17 @@ def _partition_spdt_paths(
                     visited_insts.add(inst.id)
         return visited_insts, visited_nodes
 
-    # Path A = reachable from P2, not going through P1 or P3
-    path_a_ids, path_a_nodes = _reachable_from(p2_node, {p1_node, p3_node}) if p2_node else (set(), set())
-    # Path B = reachable from P3, not going through P1 or P2
-    path_b_ids, path_b_nodes = _reachable_from(p3_node, {p1_node, p2_node}) if p3_node else (set(), set())
+    # Path A = reachable from P2, stopping at P1, P3, and N_COM
+    exclude_a = {p1_node, p3_node}
+    if n_com_node:
+        exclude_a.add(n_com_node)
+    path_a_ids, path_a_nodes = _reachable_from(p2_node, exclude_a) if p2_node else (set(), set())
+
+    # Path B = reachable from P3, stopping at P1, P2, and N_COM
+    exclude_b = {p1_node, p2_node}
+    if n_com_node:
+        exclude_b.add(n_com_node)
+    path_b_ids, path_b_nodes = _reachable_from(p3_node, exclude_b) if p3_node else (set(), set())
 
     def _shunt_tap(inst) -> str:
         """Return the non-ground tap node of a shunt instance."""
@@ -361,16 +402,22 @@ def _assign_spdt_coordinates(
         """
         Layout one SPDT signal path.
 
-        Returns (placed, end_x, gate_pos_series, gate_pos_shunt) where
-        gate_pos_* = (x, y) of the FET gate (= FET origin for WIN_PP1029_CPW).
+        Supports multi-stage topologies with multiple series FETs:
+        - First series FET placed at the SPDT junction (branch_x).
+        - Additional series FETs placed in the 1-unit gap between consecutive
+          passives, at the position where their drain node meets a passive P2.
+
+        Returns (placed, end_x, gate_pos_first_ser, gate_pos_shunt, all_ser_gate_positions)
+          all_ser_gate_positions: {fet_id: (gate_x, gate_y)} for ALL series FETs.
         """
         placed = []
         node_pos: dict = {}   # {node_name: (x, y)} for wire computation
 
-        # ── Series FET (angle=90) ─────────────────────────────────────────────
+        # ── First series FET (angle=90) at SPDT junction ──────────────────────
         # origin=(branch_x+0.5, path_y-0.5) → drain=(branch_x, path_y), source=(branch_x+1, path_y)
         ser_fet = series_fets_p[0] if series_fets_p else None
         gate_pos_ser = None
+        all_ser_gate_positions: dict = {}
         if ser_fet:
             org_x = round(branch_x + 0.5, 4)
             org_y = round(path_y - 0.5, 4)
@@ -380,37 +427,60 @@ def _assign_spdt_coordinates(
                 angle=90.0, params=ser_fet.params, role=ser_fet.role,
             ))
             gate_pos_ser = (org_x, org_y)
+            all_ser_gate_positions[ser_fet.id] = gate_pos_ser
             node_pos[ser_fet.nodes[0]] = (branch_x,       round(path_y, 4))   # drain = N_COM
             node_pos[ser_fet.nodes[1]] = (branch_x + 1.0, round(path_y, 4))   # source = N_A1/N_B1
             source_node = ser_fet.nodes[1]
         else:
             source_node = None
 
-        # ── Series passives — ordered from FET source to output port ─────────
+        # ── Build ordered chain: passives + extra series FETs ────────────────
+        # Include extra series FETs in the chain so _order_chain can traverse
+        # through FET-to-passive boundaries in multi-stage topologies.
+        extra_ser_fets = series_fets_p[1:]
+        all_chain_elements = list(series_passives) + list(extra_ser_fets)
         if source_node and port_out_node:
-            ordered_passives = _order_chain(series_passives, source_node, port_out_node)
+            ordered_elements = _order_chain(all_chain_elements, source_node, port_out_node)
         else:
-            ordered_passives = list(series_passives)
-        if not ordered_passives and series_passives:
-            ordered_passives = list(series_passives)
+            ordered_elements = list(series_passives)
+        if not ordered_elements and all_chain_elements:
+            ordered_elements = list(series_passives)
             warnings.append(
-                f"[WARN] Could not order path passives from '{source_node}' to "
+                f"[WARN] Could not order path elements from '{source_node}' to "
                 f"'{port_out_node}' — using buildplan order"
             )
 
-        # Passives start at FET source x (co-located with source pin — no wire needed)
+        # Walk the chain: passives advance px; extra FETs occupy the gap at current px.
+        # After advancing for a passive, px points to the next passive's P1.
+        # An extra FET between two passives:
+        #   drain  = (px - COMP_WIDTH, path_y)  [= prev passive P2]
+        #   source = (px,              path_y)  [= next passive P1, co-located]
+        #   origin = (px - 0.5,        path_y - 0.5)
+        # px does NOT advance for a FET — the next passive starts at the same px.
         px = round(branch_x + 1.0, 4)
-        for inst in ordered_passives:
-            placed.append(PlacedInstance(
-                id=inst.id, ads_lib=inst.ads_lib, ads_cell=inst.ads_cell,
-                ads_view=inst.ads_view, x=round(px, 4), y=round(path_y, 4),
-                angle=ANGLE_SERIES, params=inst.params, role=inst.role,
-            ))
-            # Use setdefault: first assignment wins (P2 of previous comp = correct tap x)
-            # e.g. LPATH_A P2 sets N_A3=9.875; ROUT_A P1 at 10.875 must NOT overwrite it.
-            node_pos.setdefault(inst.nodes[0], (round(px, 4),             round(path_y, 4)))
-            node_pos.setdefault(inst.nodes[1], (round(px + COMP_WIDTH, 4), round(path_y, 4)))
-            px += COMPONENT_SPACING
+        for elem in ordered_elements:
+            if elem.role == "fet_series":
+                extra_org_x = round(px - 0.5, 4)
+                extra_org_y = round(path_y - 0.5, 4)
+                placed.append(PlacedInstance(
+                    id=elem.id, ads_lib=elem.ads_lib, ads_cell=elem.ads_cell,
+                    ads_view=elem.ads_view, x=extra_org_x, y=extra_org_y,
+                    angle=90.0, params=elem.params, role=elem.role,
+                ))
+                all_ser_gate_positions[elem.id] = (extra_org_x, extra_org_y)
+                node_pos.setdefault(elem.nodes[0], (round(px - COMP_WIDTH, 4), round(path_y, 4)))
+                node_pos.setdefault(elem.nodes[1], (round(px,             4), round(path_y, 4)))
+                # px does NOT advance — next passive is co-located with FET source
+            else:
+                placed.append(PlacedInstance(
+                    id=elem.id, ads_lib=elem.ads_lib, ads_cell=elem.ads_cell,
+                    ads_view=elem.ads_view, x=round(px, 4), y=round(path_y, 4),
+                    angle=ANGLE_SERIES, params=elem.params, role=elem.role,
+                ))
+                # Use setdefault: first assignment wins (P2 of previous comp = correct tap x)
+                node_pos.setdefault(elem.nodes[0], (round(px, 4),              round(path_y, 4)))
+                node_pos.setdefault(elem.nodes[1], (round(px + COMP_WIDTH, 4), round(path_y, 4)))
+                px += COMPONENT_SPACING
 
         end_x = round(px - COMPONENT_SPACING + COMP_WIDTH, 4)
 
@@ -468,13 +538,13 @@ def _assign_spdt_coordinates(
                     angle=ANGLE_GND, params=gnd.params, role=gnd.role,
                 ))
 
-        return placed, end_x, gate_pos_ser, gate_pos_sh
+        return placed, end_x, gate_pos_ser, gate_pos_sh, all_ser_gate_positions
 
     # ── Layout both paths ─────────────────────────────────────────────────────
-    placed_a, end_x_a, ser_gate_a, sh_gate_a = _layout_spdt_path(
+    placed_a, end_x_a, ser_gate_a, sh_gate_a, ser_gate_map_a = _layout_spdt_path(
         path_a_series, path_a_shunts, ser_fets_a, sh_fets_a, PATH_A_Y, p2_node,
     )
-    placed_b, end_x_b, ser_gate_b, sh_gate_b = _layout_spdt_path(
+    placed_b, end_x_b, ser_gate_b, sh_gate_b, ser_gate_map_b = _layout_spdt_path(
         path_b_series, path_b_shunts, ser_fets_b, sh_fets_b, PATH_B_Y, p3_node,
     )
     placed_instances.extend(placed_a)
@@ -483,10 +553,10 @@ def _assign_spdt_coordinates(
     # ── fetbias: origin=(gate_x-2.0, gate_y) so GATE pin lands at FET gate ───
     # fetbias symbol: VCTRL pin at (0,0)=origin, GATE pin at (2.0,0) from origin.
     gate_pos_map: dict = {}
-    if ser_fets_a and ser_gate_a: gate_pos_map[ser_fets_a[0].id] = ser_gate_a
-    if sh_fets_a  and sh_gate_a:  gate_pos_map[sh_fets_a[0].id]  = sh_gate_a
-    if ser_fets_b and ser_gate_b: gate_pos_map[ser_fets_b[0].id] = ser_gate_b
-    if sh_fets_b  and sh_gate_b:  gate_pos_map[sh_fets_b[0].id]  = sh_gate_b
+    gate_pos_map.update(ser_gate_map_a)   # all series FETs in path A
+    gate_pos_map.update(ser_gate_map_b)   # all series FETs in path B
+    if sh_fets_a and sh_gate_a: gate_pos_map[sh_fets_a[0].id] = sh_gate_a
+    if sh_fets_b and sh_gate_b: gate_pos_map[sh_fets_b[0].id] = sh_gate_b
 
     for inst in all_fetbias:
         fet_id = inst.id.replace("BIAS_", "Q_", 1)   # BIAS_SW_SERIES_A → Q_SW_SERIES_A

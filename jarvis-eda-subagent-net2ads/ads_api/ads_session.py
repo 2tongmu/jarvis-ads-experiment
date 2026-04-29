@@ -115,10 +115,29 @@ def _find_ads_dir(explicit: Optional[str] = None) -> Optional[Path]:
 
 
 def _ensure_ads_on_path(ads_dir: Path) -> None:
-    """Insert ADS packages dir at the front of sys.path if not already present."""
+    """
+    Insert ADS packages dir at the front of sys.path and register ADS DLL
+    directories so that native .pyd extensions can resolve their dependencies.
+
+    On Python 3.8+ on Windows, sys.path changes no longer affect DLL loading
+    for extension modules (PEP 451 / Python 3.8 DLL path isolation). We must
+    call os.add_dll_directory() for each directory that contains ADS native DLLs.
+    The critical directories are 'bin' (main ADS DLLs) and
+    'tools/python/packages' (native Python extension DLLs).
+    """
     packages_path = str(ads_dir / _PACKAGES_SUBPATH)
     if packages_path not in sys.path:
         sys.path.insert(0, packages_path)
+
+    # Register DLL search directories (no-op on non-Windows or Python < 3.8)
+    if hasattr(os, "add_dll_directory"):
+        bin_dir = ads_dir / "bin"
+        for dll_dir in (bin_dir, ads_dir / _PACKAGES_SUBPATH):
+            if dll_dir.is_dir():
+                try:
+                    os.add_dll_directory(str(dll_dir))
+                except OSError:
+                    pass
 
 
 @dataclass
@@ -185,7 +204,12 @@ def get_ads_session(ads_dir: Optional[str] = None, force_reinit: bool = False) -
         )
 
     _ensure_ads_on_path(found_dir)
-    os.environ.setdefault("HPEESOF_DIR", str(found_dir))
+    # Always set HPEESOF_DIR to match the discovered/explicit installation.
+    # Do NOT use setdefault: the system environment may already have HPEESOF_DIR
+    # pointing at an older ADS version, which would cause DLL loading to fail
+    # for the current Python interpreter (keysight.ads.ael._setup_support reads
+    # this variable to find the bin directory for os.add_dll_directory).
+    os.environ["HPEESOF_DIR"] = str(found_dir)
 
     # ── Import ADS modules ────────────────────────────────────────────────────
     try:

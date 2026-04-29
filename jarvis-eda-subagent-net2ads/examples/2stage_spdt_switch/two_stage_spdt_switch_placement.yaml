@@ -1,0 +1,372 @@
+cell_name: TWO_STAGE_SPDT_SWITCH
+source_buildplan: C:\Github_folders\jarvis-ads-experiment\jarvis-eda-subagent-net2ads\examples\2stage_spdt_switch\2stage_spdt_switch_research.net
+generation_timestamp: '2026-04-29T01:54:43'
+ports:
+- name: P1
+  node: P1
+  number: 1
+  x: 1.375
+  y: 0.0
+- name: P2
+  node: P2
+  number: 2
+  x: 13.875
+  y: 2.0
+- name: P3
+  node: P3
+  number: 3
+  x: 13.875
+  y: -2.0
+instances:
+- id: RIN_PAD
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 2.875
+  y: 0.0
+  angle: 0.0
+  params:
+    R: 0.05 Ohm
+  role: series
+- id: LIN_PAD
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  x: 4.875
+  y: 0.0
+  angle: 0.0
+  params:
+    L: 10 pH
+  role: series
+- id: Q_SW_SERIES_A1
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 6.375
+  y: 1.5
+  angle: 90.0
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+- id: RMATCH_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 6.875
+  y: 2.0
+  angle: 0.0
+  params:
+    R: 0.05 Ohm
+  role: series
+- id: LMATCH_A
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  x: 8.875
+  y: 2.0
+  angle: 0.0
+  params:
+    L: 20 pH
+  role: series
+- id: Q_SW_SERIES_A2
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 10.375
+  y: 1.5
+  angle: 90.0
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+- id: RPATH_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 10.875
+  y: 2.0
+  angle: 0.0
+  params:
+    R: 0.10 Ohm
+  role: series
+- id: ROUT_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 12.875
+  y: 2.0
+  angle: 0.0
+  params:
+    R: 0.05 Ohm
+  role: series
+- id: Q_SW_SHUNT_A
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 11.375
+  y: 1.5
+  angle: 0.0
+  params:
+    NOF: '2'
+    UGW: 100 um
+  role: fet_shunt
+- id: RTERM_A
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 11.875
+  y: 1.0
+  angle: -90.0
+  params:
+    R: 50 Ohm
+  role: shunt
+- id: GND_RTERM_A
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  x: 11.875
+  y: 0.0
+  angle: -90.0
+  params: {}
+  role: gnd
+- id: Q_SW_SERIES_B1
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 6.375
+  y: -2.5
+  angle: 90.0
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+- id: RMATCH_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 6.875
+  y: -2.0
+  angle: 0.0
+  params:
+    R: 0.05 Ohm
+  role: series
+- id: LMATCH_B
+  ads_lib: ads_rflib
+  ads_cell: L
+  ads_view: symbol
+  x: 8.875
+  y: -2.0
+  angle: 0.0
+  params:
+    L: 20 pH
+  role: series
+- id: Q_SW_SERIES_B2
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 10.375
+  y: -2.5
+  angle: 90.0
+  params:
+    NOF: '2'
+    UGW: 160 um
+  role: fet_series
+- id: RPATH_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 10.875
+  y: -2.0
+  angle: 0.0
+  params:
+    R: 0.10 Ohm
+  role: series
+- id: ROUT_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 12.875
+  y: -2.0
+  angle: 0.0
+  params:
+    R: 0.05 Ohm
+  role: series
+- id: Q_SW_SHUNT_B
+  ads_lib: WIN_PP1029_DESIGN_KIT
+  ads_cell: WIN_PP1029_CPW
+  ads_view: symbol
+  x: 11.375
+  y: -2.5
+  angle: 0.0
+  params:
+    NOF: '2'
+    UGW: 100 um
+  role: fet_shunt
+- id: RTERM_B
+  ads_lib: ads_rflib
+  ads_cell: R
+  ads_view: symbol
+  x: 11.875
+  y: -3.0
+  angle: -90.0
+  params:
+    R: 50 Ohm
+  role: shunt
+- id: GND_RTERM_B
+  ads_lib: ads_rflib
+  ads_cell: GROUND
+  ads_view: symbol
+  x: 11.875
+  y: -4.0
+  angle: -90.0
+  params: {}
+  role: gnd
+- id: BIAS_SW_SERIES_A1
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  x: 4.375
+  y: 1.5
+  angle: 0.0
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+- id: BIAS_SW_SERIES_A2
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  x: 8.375
+  y: 1.5
+  angle: 0.0
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+- id: BIAS_SW_SHUNT_A
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  x: 9.375
+  y: 1.5
+  angle: 0.0
+  params:
+    Rs: 1040.2 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+- id: BIAS_SW_SERIES_B1
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  x: 4.375
+  y: -2.5
+  angle: 0.0
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+- id: BIAS_SW_SERIES_B2
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  x: 8.375
+  y: -2.5
+  angle: 0.0
+  params:
+    Rs: 1000.0 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+- id: BIAS_SW_SHUNT_B
+  ads_lib: net2ads_lib
+  ads_cell: fetbias_sw_gate
+  ads_view: symbol
+  x: 9.375
+  y: -2.5
+  angle: 0.0
+  params:
+    Rs: 1040.2 Ohm
+    Cp: 2272.73 fF
+    Vgate: 0.0 V
+  role: fetbias
+wires:
+- id: wire_0
+  points:
+  - !!python/tuple
+    - 7.875
+    - 2.0
+  - !!python/tuple
+    - 8.875
+    - 2.0
+  note: net 'N_A1R' y=2.0
+- id: wire_1
+  points:
+  - !!python/tuple
+    - 11.875
+    - 2.0
+  - !!python/tuple
+    - 12.875
+    - 2.0
+  note: net 'N_A3' y=2.0
+- id: wire_2
+  points:
+  - !!python/tuple
+    - 7.875
+    - -2.0
+  - !!python/tuple
+    - 8.875
+    - -2.0
+  note: net 'N_B1R' y=-2.0
+- id: wire_3
+  points:
+  - !!python/tuple
+    - 11.875
+    - -2.0
+  - !!python/tuple
+    - 12.875
+    - -2.0
+  note: net 'N_B3' y=-2.0
+- id: wire_4
+  points:
+  - !!python/tuple
+    - 3.875
+    - 0.0
+  - !!python/tuple
+    - 4.875
+    - 0.0
+  note: net 'N_IN' y=0.0
+- id: wire_5
+  points:
+  - !!python/tuple
+    - 1.375
+    - 0.0
+  - !!python/tuple
+    - 2.875
+    - 0.0
+  note: net 'P1' y=0.0
+- id: wire_6
+  points:
+  - !!python/tuple
+    - 5.875
+    - 0.0
+  - !!python/tuple
+    - 5.875
+    - 2.0
+  note: 'N_COM: y=0 -> path_a'
+- id: wire_7
+  points:
+  - !!python/tuple
+    - 5.875
+    - 0.0
+  - !!python/tuple
+    - 5.875
+    - -2.0
+  note: 'N_COM: y=0 -> path_b'
+warnings:
+- '[INFO] Backbone trace skipped for 3-port topology (''P1'' -> ''P2''). Expected
+  for SPDT circuits.'
